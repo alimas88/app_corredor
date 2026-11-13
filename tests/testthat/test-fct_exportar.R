@@ -31,18 +31,37 @@ test_that("preparar_aba() tira a geometria e converte list-columns em texto", {
   expect_equal(aba$lista, "a; b")
 })
 
-test_that("escrever_xlsx() grava o Resumo e uma aba por tema", {
+test_that("escrever_xlsx() grava o Resumo com a situação e uma aba por tema verificado", {
   skip_if_not_installed("readxl")
 
   resultados <- list(
-    "Terras Indígenas" = dplyr::tibble(nome = c("A", "B")),
-    "Rodovias" = dplyr::tibble(nome = character(0))
+    "Terras Indígenas" = resultado_tema(dplyr::tibble(nome = c("A", "B"))),
+    "Rodovias" = resultado_tema(dplyr::tibble(nome = character(0))),
+    "Processos/Minerários" = resultado_tema(erro = simpleError("tempo esgotado"))
   )
   arquivo <- withr::local_tempfile(fileext = ".xlsx")
 
   escrever_xlsx(resultados, arquivo)
 
+  # tema não verificado não tem aba
   expect_equal(readxl::excel_sheets(arquivo), c("Resumo", "Terras Indígenas", "Rodovias"))
+
   resumo <- readxl::read_excel(arquivo, sheet = "Resumo")
-  expect_equal(resumo$Registros, c(2, 0))
+  expect_equal(resumo$Tema, c("Processos/Minerários", "Terras Indígenas", "Rodovias"))
+  expect_equal(resumo$`Situação`,
+               c("não verificado", "com interferência", "sem interferência"))
+  expect_equal(resumo$Registros, c(NA, 2, 0))
+  expect_equal(resumo$Aba, c(NA, "Terras Indígenas", "Rodovias"))
+  expect_equal(resumo$`Observação`, c("tempo esgotado", NA, NA))
+})
+
+test_that("escrever_xlsx() não repete o nome da aba Resumo", {
+  skip_if_not_installed("readxl")
+
+  resultados <- list(Resumo = resultado_tema(dplyr::tibble(x = 1)))
+  arquivo <- withr::local_tempfile(fileext = ".xlsx")
+
+  escrever_xlsx(resultados, arquivo)
+
+  expect_equal(readxl::excel_sheets(arquivo), c("Resumo", "Resumo_1"))
 })

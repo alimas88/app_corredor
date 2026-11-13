@@ -38,33 +38,33 @@ app_ui <- function(request) {
                   fluidPage(
                     tabBox(
                       title = 'Político/Administrativo', width = 12,
-                      tabPanel('Municípios', mod_banco_ui('infra_municipio')),
-                      tabPanel('Áreas Urbanas', mod_banco_ui('infra_area_urbana'))
+                      tabPanel('Municípios', mod_tema_ui('infra_municipio')),
+                      tabPanel('Áreas Urbanas', mod_tema_ui('infra_area_urbana'))
                     ),
 
                     tabBox(
                       title = 'Transmissão', width = 12,
-                      tabPanel('Linhas de Transmissão', mod_banco_ui('infra_lt')),
-                      tabPanel('Subestações', mod_banco_ui('subestacao'))
+                      tabPanel('Linhas de Transmissão', mod_tema_ui('infra_lt')),
+                      tabPanel('Subestações', mod_tema_ui('subestacao'))
                     ),
 
                     tabBox(
                       title = 'Geração', width = 12,
-                      tabPanel('Usinas', mod_banco_ui('usinas'))
+                      tabPanel('Usinas', mod_tema_ui('usinas'))
                     ),
 
                     tabBox(
                       title = 'Dutos', width = 12,
-                      tabPanel('Gasoduto Transporte', mod_banco_ui('gasoduto_transporte')),
-                      tabPanel('Dutos Escoamento', mod_banco_ui('duto_escoamento')),
-                      tabPanel('Gasoduto Distribuição', mod_banco_ui('gasoduto_distribuicao'))
+                      tabPanel('Gasoduto Transporte', mod_tema_ui('gasoduto_transporte')),
+                      tabPanel('Dutos Escoamento', mod_tema_ui('duto_escoamento')),
+                      tabPanel('Gasoduto Distribuição', mod_tema_ui('gasoduto_distribuicao'))
                     ),
 
                     tabBox(
                       title = 'Transportes', width = 12,
-                      tabPanel('Rodovias', mod_banco_ui('transportes_rodovias')),
-                      tabPanel('Aeródromos', mod_banco_ui('transportes_aerodromos')),
-                      tabPanel('Ferrovias', mod_banco_ui('transportes_ferrovias'))
+                      tabPanel('Rodovias', mod_tema_ui('transportes_rodovias')),
+                      tabPanel('Aeródromos', mod_tema_ui('transportes_aerodromos')),
+                      tabPanel('Ferrovias', mod_tema_ui('transportes_ferrovias'))
                     )
                   )
           ),
@@ -75,7 +75,7 @@ app_ui <- function(request) {
                   fluidPage(
                     tabBox(
                       title = 'Uso do Solo', width = 12,
-                      tabPanel('MapBiomas', mod_raster_bd_ui('mapbiomas'))
+                      tabPanel('MapBiomas', mod_tema_ui('mapbiomas'))
                     )
                   )
           ),
@@ -86,9 +86,9 @@ app_ui <- function(request) {
                   fluidPage(
                     tabBox(
                       title = 'Meio Físico', width = 12,
-                      tabPanel("Hidrografia", mod_sobreposicao_ui('curso_agua')),
-                      tabPanel('Cavernas', mod_banco_ui('caverna')),
-                      tabPanel('Declividade', mod_raster_bd_ui('declividade'))
+                      tabPanel("Hidrografia", mod_tema_ui('curso_agua')),
+                      tabPanel('Cavernas', mod_tema_ui('caverna')),
+                      tabPanel('Declividade', mod_tema_ui('declividade'))
                     )
                   )
           ),
@@ -99,7 +99,7 @@ app_ui <- function(request) {
                   fluidPage(
                     tabBox(
                       title = 'Processos Minerários', width = 12,
-                      tabPanel('Processos Minerários', mod_banco_ui('pm'))
+                      tabPanel('Processos Minerários', mod_tema_ui('pm'))
                     )
                   )
           ),
@@ -110,13 +110,13 @@ app_ui <- function(request) {
                   fluidPage(
                     tabBox(
                       title = 'Áreas Protegidas', width = 12,
-                      tabPanel('Terras Indígenas', mod_banco_ui('terra_indigena')),
-                      tabPanel('Terras Quilombolas', mod_banco_ui('terra_quilombola')),
-                      tabPanel('Projetos de Assentamento', mod_banco_ui('projeto_assentamento')),
-                      tabPanel('Unidades de Conservação', mod_banco_ui('uc')),
-                      tabPanel('UC Complementar', mod_banco_ui('uc_complementar')),
-                      tabPanel('RPPN', mod_banco_ui('rppn')),
-                      tabPanel('Sítios Arqueológicos', mod_banco_ui('sitios_arqueologicos'))
+                      tabPanel('Terras Indígenas', mod_tema_ui('terra_indigena')),
+                      tabPanel('Terras Quilombolas', mod_tema_ui('terra_quilombola')),
+                      tabPanel('Projetos de Assentamento', mod_tema_ui('projeto_assentamento')),
+                      tabPanel('Unidades de Conservação', mod_tema_ui('uc')),
+                      tabPanel('UC Complementar', mod_tema_ui('uc_complementar')),
+                      tabPanel('RPPN', mod_tema_ui('rppn')),
+                      tabPanel('Sítios Arqueológicos', mod_tema_ui('sitios_arqueologicos'))
                     )
                   )
           )
