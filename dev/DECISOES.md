@@ -1,6 +1,6 @@
 # analise.corredor: decisões e pendências
 
-Registro das decisões da sessão de definição de 21/10/2026, atualizado em 10, 11, 12 e 13/11/2026 com as decisões sobre rasters, legendas do MapBiomas, declividade, geometrias inválidas para o s2 e validação do envio da área de estudo. O vocabulário está em `dev/CONTEXT.md`.
+Registro das decisões da sessão de definição de 21/10/2026, atualizado em 10, 11, 12 e 13/11/2026 com as decisões sobre rasters, legendas do MapBiomas, declividade, geometrias inválidas para o s2, validação do envio da área de estudo, testes automatizados e ordem dos próximos passos. O vocabulário está em `dev/CONTEXT.md`.
 
 ## Decidido
 
@@ -110,7 +110,27 @@ Registro das decisões da sessão de definição de 21/10/2026, atualizado em 10
 - **Mensagem:** numa caixa própria acima do mapa, substituída a cada envio e apagada quando o envio dá certo. O mapa nunca recebe erro: mostra o Brasil sem corredor e o polígono com corredor. A causa da mensagem persistente não foi reproduzida; a hipótese é que o erro ia para o próprio `leafletOutput`, que não o limpava ao renderizar de novo.
 - **Envio inválido descarta o corredor anterior:** o mapa volta ao Brasil, e as tabelas dos temas ficam vazias (param no `req()`) e saem da planilha exportada até o próximo envio válido. Motivo: não manter na tela resultados de um arquivo que não é o último enviado. Para manter o anterior, trocar `corredor(lido$sf)` por `if (!is.null(lido$sf)) corredor(lido$sf)` no `mod_corredor.R`.
 - **Provisório:** vale até a reestruturação da entrada (`.kml/.kmz`, `.gpkg`, `.gdb` e traçado com buffer, ver "Entrada" e "Fluxo do buffer"). A conferência do shapefile deve ser reaproveitada lá.
-- Falta testar no app em execução.
+- Falta testar no app em execução. A leitura e as mensagens de erro de `ler_corredor()` já estão cobertas pelos testes automatizados (ver "Testes automatizados").
+
+### Testes automatizados (13/11/2026)
+
+- **Estrutura:** `testthat` (edição 3), em `tests/testthat/`, um arquivo por `fct_*`. Rodar com `devtools::test()`. Nenhum teste acessa o banco.
+- **Cobertura inicial:** `ler_corredor()` (todos os erros previstos do `.zip`, pasta interna, arquivos do macOS, reprojeção), `nomes_abas_validos()`, `preparar_aba()`, `escrever_xlsx()`, registro de resultados, leitura do `golem-config.yml` e `contar_raster_bd()`.
+- **`contar_raster_bd()` sem banco:** o `DBI::dbGetQuery()` é simulado com `local_mocked_bindings()` e devolve tiles GeoTIFF gerados no teste. A contagem é comparada com a do raster inteiro, como na validação de 11/11/2026.
+- **Área de estudo de teste:** gerada em `tests/testthat/helper-area_estudo.R` (buffer de 2,5 km de uma linha inventada no Brasil Central). Substitui o objeto `corredor`, que estava documentado mas não existia em `data/`.
+- **`coletar_resultados()`:** passou a avaliar cada resultado com `isolate()`, para rodar também fora de um contexto reativo.
+
+### Próximos passos sem alteração da UI (definidos em 13/11/2026)
+
+Ordem acordada:
+
+1. Testes automatizados e limpeza: feito em 13/11/2026. Saíram `query_bd()` (sem uso), o objeto `corredor` (documentação sem dado) e `data-raw/corredor.R`.
+2. Separar a consulta de cada tema (função pura, ex.: `analisar_tema(con, tema, area)`) da exibição (módulo), e implementar a situação do tema no registro e na aba "Resumo" da planilha de conferência. Hoje um tema que falha some da planilha, como se não existisse.
+3. Filtro espacial dos temas vetoriais pelo polígono da área de estudo, e não pelo bbox, com a geometria em WKB (`STAsBinary`) em vez de WKT.
+4. Funções de entrada e buffer (`ler_tracado()`, `gerar_area_estudo()`, `parse_distancia()`), sem ligar na UI.
+5. Catálogo de temas no `golem-config.yml` (chave, nome, grupo, tipo, colunas exibidas), substituindo a lista fixa do `app_server.R`. Fica no YAML por enquanto; a ida para o banco será avaliada com o catálogo de rasters (ver Adiado).
+
+- **`shinydashboard`:** continua no `DESCRIPTION` enquanto o app publicado usar essa interface. Sai na migração para `bslib`.
 
 ## Adiado (implementação futura)
 
