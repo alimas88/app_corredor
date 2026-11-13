@@ -1,7 +1,9 @@
 #' Avalia os reactives do registro
 #'
 #' @description Executa cada reactive registrado. Os que falharem (por exemplo,
-#' `req()` sem corredor) são ignorados. Geometrias são removidas.
+#' `req()` sem corredor) são ignorados. Geometrias são removidas. Os reactives
+#' são avaliados com `isolate()`, então a função também roda fora de um
+#' contexto reativo (ex.: nos testes).
 #'
 #' @param registro reactiveVal criado por `registro_criar()`.
 #'
@@ -10,7 +12,7 @@
 coletar_resultados <- function(registro) {
 
   shiny::isolate(registro()) %>%
-    purrr::map(~ tryCatch(.x(), error = function(e) NULL)) %>%
+    purrr::map(~ tryCatch(shiny::isolate(.x()), error = function(e) NULL)) %>%
     purrr::compact() %>%
     purrr::map(preparar_aba)
 }
