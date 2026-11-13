@@ -1,13 +1,13 @@
 # analise.corredor: decisões e pendências
 
-Registro das decisões da sessão de definição de 21/10/2026, atualizado em 10, 11, 12 e 13/11/2026 com as decisões sobre rasters, legendas do MapBiomas, declividade, geometrias inválidas para o s2, validação do envio da área de estudo, testes automatizados e ordem dos próximos passos. O vocabulário está em `dev/CONTEXT.md`.
+Registro das decisões da sessão de definição de 21/10/2026, atualizado em 10, 11, 12 e 13/11/2026 com as decisões sobre rasters, legendas do MapBiomas, declividade, geometrias inválidas para o s2, validação do envio da área de estudo, testes automatizados, ordem dos próximos passos e filtro espacial pelo polígono. O vocabulário está em `dev/CONTEXT.md`.
 
 ## Decidido
 
 - **Objetivo:** otimizar e viabilizar a publicação do app. Os temas entram aos poucos.
-- **Área de estudo:** uma por análise. Gerada por buffer do traçado (ponto, linha ou ambos) ou enviada pronta. Polígono enviado é usado como veio, e a distância de buffer fica desabilitada.
+- **Área de estudo:** uma por análise. Gerada por buffer do traçado (ponto ou linha) ou enviada pronta. Polígono enviado é usado como veio, e a distância de buffer fica desabilitada.
 - **Distância de buffer:** única para todos os temas. Testa-se um valor por vez: alterar a distância recalcula e descarta os resultados anteriores.
-- **SE + LT em conjunto:** permitido. O usuário envia os dois traçados ou uma área de estudo pronta, e o app une tudo em um só polígono.
+- **Vários empreendimentos juntos (ex.: seccionamento curto perto de uma SE planejada):** o app não tem tratamento especial. O analista monta a geometria e envia uma só: um polígono que engloba os empreendimentos (geralmente uma circunferência) ou um ponto central para o app gerar o buffer (revisto em 13/11/2026; antes, o app uniria os traçados de SE e LT).
 - **Interferência:** só o que intersecta diretamente a área de estudo. A faixa de proximidade (ex.: aeródromos a 3 km) não será implantada agora.
 - **Situação do tema:** três estados (com interferência, sem interferência, não verificado). Temas não verificados aparecem em destaque na síntese e na planilha, e a geração do Word avisa antes de exportar.
 - **Saídas:** planilha de conferência (xlsx, uma aba por tema) e síntese das interferências (Word de apoio, uma tabela por tema com o nome do tema). Por ora, sem resumos nem regras por tema.
@@ -126,8 +126,8 @@ Ordem acordada:
 
 1. Testes automatizados e limpeza: feito em 13/11/2026. Saíram `query_bd()` (sem uso), o objeto `corredor` (documentação sem dado) e `data-raw/corredor.R`.
 2. Separar a consulta de cada tema da exibição e implementar a situação do tema: feito em 13/11/2026 (ver "Situação do tema e módulo genérico").
-3. Filtro espacial dos temas vetoriais pelo polígono da área de estudo, e não pelo bbox, com a geometria em WKB (`STAsBinary`) em vez de WKT.
-4. Funções de entrada e buffer (`ler_tracado()`, `gerar_area_estudo()`, `parse_distancia()`), sem ligar na UI.
+3. Filtro espacial dos temas vetoriais pelo polígono da área de estudo, com a geometria em WKB: feito em 13/11/2026 (ver "Filtro espacial pelo polígono"). Falta medir o ganho com o banco.
+4. Funções de entrada e buffer (`ler_tracado()`, `gerar_area_estudo()`, `parse_distancia()`), sem ligar na UI. Em aberto: o que fazer com um traçado de LT em vários segmentos (várias feições de linha).
 5. Catálogo de temas no `golem-config.yml` (chave, nome, grupo, tipo, colunas exibidas), substituindo a lista fixa do `app_server.R`. Fica no YAML por enquanto; a ida para o banco será avaliada com o catálogo de rasters (ver Adiado).
 
 ### Situação do tema e módulo genérico (13/11/2026)
@@ -139,6 +139,18 @@ Ordem acordada:
 - **Na interface:** sem mudança visual. O tema não verificado mostra o motivo no lugar da tabela e um aviso na tela. Sem conexão ao banco, o aviso é único (o do início da sessão), e não um por tema.
 - **Planilha de conferência:** a aba "Resumo" traz todos os temas, com `Tema`, `Situação`, `Registros`, `Aba` e `Observação` (motivo da falha), com os não verificados no topo. Tema não verificado não tem aba própria.
 - **Ordem dos temas:** a ordem das chamadas no `app_server.R`, até o catálogo de temas (passo 5).
+
+### Filtro espacial pelo polígono (13/11/2026)
+
+- **Antes:** a consulta de cada tema vetorial trazia do banco tudo o que tocava o retângulo envolvente da área de estudo (`SELECT *` + `Shape.STAsText()`), e o R filtrava a interseção. Numa LT longa e diagonal, o retângulo cobre muito mais que o corredor, e Processos Minerários e Rodovias traziam milhares de feições à toa. A geometria vinha duas vezes: a `Shape` no formato interno do SQL Server e o WKT.
+- **Agora (`consultar_tema_bd()`):**
+  - O filtro no banco usa o polígono da área de estudo, com `MakeValid()`, a mesma expressão do `contar_raster_bd()` (`sql_geometria()`).
+  - A geometria vem só em WKB (`Shape.STAsBinary()`), mais leve que o WKT e sem perda de precisão. A `Shape` original e a `GDB_GEOMATTR_DATA` não são trazidas.
+  - As colunas de atributos vêm do `INFORMATION_SCHEMA.COLUMNS` (`colunas_tema_bd()`), com as de tamanho máximo no fim, como o driver ODBC exige. Aceita `esquema.tabela`. Custa uma consulta a mais por tema, só de metadados.
+  - O filtro com GEOS no R continua, como garantia. O SQL Server e o GEOS calculam no plano, então os dois dão o mesmo resultado.
+- **Precisão do polígono:** o `st_as_text()` arredonda por padrão para 7 algarismos significativos (~1 m em graus). O `sql_geometria()` usa 15, e o `contar_raster_bd()` passou a usar a mesma função.
+- **Tamanho da consulta:** num bipolo fictício de 2.586 km, a área de estudo tem de 1.200 a 2.900 vértices (buffer de 10 km a 40 m), e o texto da consulta fica entre 45 e 105 KB, longe do limite do SQL Server. Uma área de estudo enviada pronta, muito detalhada, pode ser maior; se a consulta ficar lenta, simplificar o polígono antes (sem encolhê-lo).
+- **Falta:** medir o tempo antes e depois num corredor real, com Processos Minerários e Rodovias, e conferir que o número de interferências não muda. Script pronto, só de leitura: `dev/medir_filtro_poligono.R`.
 
 - **`shinydashboard`:** continua no `DESCRIPTION` enquanto o app publicado usar essa interface. Sai na migração para `bslib`.
 

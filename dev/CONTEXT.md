@@ -11,7 +11,7 @@ Empreendimento representado por uma linha. Inclui bipolos de corrente contínua,
 Empreendimento representado por um ponto.
 
 **Traçado**:
-Geometria enviada pelo usuário que representa o empreendimento: linha (LT), ponto (SE) ou ambos, quando analisados em conjunto.
+Geometria enviada pelo usuário que representa o empreendimento: linha (LT) ou ponto (SE). Quando vários empreendimentos são analisados juntos, o analista envia uma só geometria (ex.: ponto central), e não um traçado por empreendimento.
 _Avoid_: eixo, shape de entrada
 
 **Distância de buffer**:
