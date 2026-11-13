@@ -1,0 +1,339 @@
+<title>Protótipo Síntese analise.corredor</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* PROTÓTIPO DESCARTÁVEL v2: page_navbar (bslib) com "Análise" (sidebar + mapa) e "Síntese" (variante A + resumo). Dados fictícios. */
+:root{
+  --bg:#f5f7f6; --surface:#ffffff; --surface-2:#eef2f0; --fg:#1d2723; --muted:#5d6b65; --line:#d7dfdb;
+  --accent:#1f6f5c; --accent-soft:#dcefe8; --accent-fg:#ffffff;
+  --st-com:#a5630a; --st-com-bg:#fbefd9; --st-sem:#5d6b65; --st-sem-bg:#e9eeec; --st-err:#b3261e; --st-err-bg:#fbe3e1;
+  --bar:#1d2723; --bar-fg:#ffffff;
+  --map-bg:#eef1ea; --l-area:#1f6f5c; --l-tracado:#1d2723; --l-mun:#8a8f86; --l-rod:#c2410c; --l-hid:#2563eb; --l-pm:#9333ea; --l-sit:#b91c1c; --l-aer:#0f766e;
+  --font-body:"Source Sans 3", "Segoe UI", system-ui, sans-serif; --font-mono:"JetBrains Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#121816; --surface:#1a2220; --surface-2:#212b28; --fg:#e4ebe8; --muted:#9aaaa3; --line:#2e3a36;
+  --accent:#5cc3a6; --accent-soft:#1d3a32; --accent-fg:#0d1513;
+  --st-com:#f0b45a; --st-com-bg:#3a2c14; --st-sem:#9aaaa3; --st-sem-bg:#26302d; --st-err:#ff8a80; --st-err-bg:#3d1c1a;
+  --bar:#e4ebe8; --bar-fg:#121816;
+  --map-bg:#1b2420; --l-area:#5cc3a6; --l-tracado:#e4ebe8; --l-mun:#6f7a74; --l-rod:#fb923c; --l-hid:#60a5fa; --l-pm:#c084fc; --l-sit:#f87171; --l-aer:#2dd4bf;
+  color-scheme:dark }}
+:root[data-theme="dark"]{
+  --bg:#121816; --surface:#1a2220; --surface-2:#212b28; --fg:#e4ebe8; --muted:#9aaaa3; --line:#2e3a36;
+  --accent:#5cc3a6; --accent-soft:#1d3a32; --accent-fg:#0d1513;
+  --st-com:#f0b45a; --st-com-bg:#3a2c14; --st-sem:#9aaaa3; --st-sem-bg:#26302d; --st-err:#ff8a80; --st-err-bg:#3d1c1a;
+  --bar:#e4ebe8; --bar-fg:#121816;
+  --map-bg:#1b2420; --l-area:#5cc3a6; --l-tracado:#e4ebe8; --l-mun:#6f7a74; --l-rod:#fb923c; --l-hid:#60a5fa; --l-pm:#c084fc; --l-sit:#f87171; --l-aer:#2dd4bf;
+  color-scheme:dark }
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--font-body);font-size:15px;line-height:1.45}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--surface)}
+.wrap{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+button{font:inherit;color:inherit;cursor:pointer}
+button:disabled{cursor:not-allowed;opacity:.5}
+button:focus-visible,input:focus-visible,select:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.nav{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--surface);border-bottom:1px solid var(--line)}
+.nav-in{display:flex;align-items:center;gap:20px;flex-wrap:wrap;padding-block:10px}
+.brand{font-weight:700;font-family:var(--font-mono);font-size:14px;letter-spacing:.02em}
+.tabs{display:flex;gap:4px}
+.tabs button{border:0;background:none;padding:6px 12px;border-radius:6px;color:var(--muted);font-weight:600}
+.tabs button.on{background:var(--accent-soft);color:var(--accent)}
+.tabs .cnt{font-size:12px;margin-left:6px;font-variant-numeric:tabular-nums}
+.nav-actions{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+.btn{border:1px solid var(--line);background:var(--surface);padding:6px 12px;border-radius:6px;font-weight:600;font-size:14px}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+.btn.block{width:100%;padding:9px 12px;font-size:15px}
+
+/* ---------- Análise: layout_sidebar ---------- */
+.an{display:grid;grid-template-columns:300px minmax(0,1fr);gap:0;min-height:calc(100vh - 56px)}
+.side{background:var(--surface);border-right:1px solid var(--line);padding:18px 16px 110px;display:flex;flex-direction:column;gap:18px}
+.step h3{margin:0 0 8px;font-size:13px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
+.drop{border:1.5px dashed var(--line);border-radius:8px;padding:14px;text-align:center;font-size:14px;color:var(--muted);background:var(--surface-2)}
+.drop b{color:var(--fg)}
+.file{display:flex;justify-content:space-between;gap:8px;align-items:center;border:1px solid var(--line);border-radius:6px;padding:8px 10px;font-size:14px}
+.file .fn{font-family:var(--font-mono);font-size:12.5px;overflow-wrap:anywhere}
+.file button{border:0;background:none;color:var(--muted)}
+.det{margin-top:8px;font-size:13.5px;color:var(--muted);display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.geo{display:inline-flex;gap:5px;align-items:center;font-weight:600;color:var(--fg);background:var(--surface-2);border-radius:4px;padding:1px 7px}
+label.lb{display:block;font-size:14px;font-weight:600;margin-bottom:4px}
+.field{width:100%;border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:6px;padding:7px 10px;font:inherit;font-variant-numeric:tabular-nums}
+.field:disabled{background:var(--surface-2);color:var(--muted)}
+.hint{font-size:12.5px;color:var(--muted);margin-top:4px}
+.hint.req{color:var(--st-com)}
+.done{border-top:1px solid var(--line);padding-top:14px;font-size:14px;display:flex;flex-direction:column;gap:8px}
+.done .row{display:flex;gap:6px;flex-wrap:wrap}
+.linkbtn{border:0;background:none;color:var(--accent);font-weight:600;padding:0;text-align:left}
+.mapwrap{position:relative;min-width:0;background:var(--map-bg)}
+.mapwrap svg{display:block;width:100%;height:100%;min-height:420px}
+.mapnote{position:absolute;left:12px;bottom:12px;font-size:12px;color:var(--muted);background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:3px 8px}
+.layers{position:absolute;top:12px;right:12px;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:13.5px;box-shadow:0 2px 10px rgb(0 0 0 / .08);max-width:calc(100% - 24px)}
+.layers h4{margin:0 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
+.layers label{display:flex;gap:8px;align-items:center;padding:2px 0;cursor:pointer}
+.sw{width:14px;height:10px;border-radius:2px;flex:none}
+.mapempty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;color:var(--muted);font-size:15px;padding:24px}
+@media (max-width:760px){.an{grid-template-columns:1fr}.side{border-right:0;border-bottom:1px solid var(--line);padding-bottom:18px}.mapwrap{min-height:440px}}
+
+/* ---------- Síntese (variante A) ---------- */
+.ctx{padding-block:14px;display:flex;flex-wrap:wrap;gap:8px 24px;align-items:baseline}
+.ctx h1{font-size:20px;margin:0;text-wrap:balance}
+.ctx .meta{color:var(--muted);font-size:14px;font-variant-numeric:tabular-nums}
+.ex{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);border:1px dashed var(--line);padding:2px 8px;border-radius:4px}
+.alert{display:flex;gap:10px;align-items:flex-start;background:var(--st-err-bg);color:var(--st-err);border:1px solid currentColor;border-radius:6px;padding:8px 12px;font-size:14px;margin-bottom:14px}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;padding:2px 9px;border-radius:999px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.pill.com{background:var(--st-com-bg);color:var(--st-com)}
+.pill.sem{background:var(--st-sem-bg);color:var(--st-sem)}
+.pill.err{background:var(--st-err-bg);color:var(--st-err)}
+.dot{width:8px;height:8px;border-radius:50%;background:currentColor;flex:none}
+.va{display:grid;grid-template-columns:minmax(260px,320px) minmax(0,1fr);gap:20px;align-items:start;padding-bottom:40px}
+.va-list{background:var(--surface);border:1px solid var(--line);border-radius:8px;overflow:hidden;position:sticky;top:calc(env(safe-area-inset-top,0px) + 64px);max-height:calc(100vh - 90px);display:flex;flex-direction:column}
+.va-filter{display:flex;gap:4px;padding:8px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.va-filter button{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:2px 10px;font-size:13px}
+.va-filter button.on{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.va-scroll{overflow-y:auto}
+.va-grp{font-size:11.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:700;padding:10px 12px 4px}
+.va-row{display:flex;width:100%;align-items:center;gap:8px;justify-content:space-between;text-align:left;border:0;background:none;padding:7px 12px;border-left:3px solid transparent}
+.va-row:hover{background:var(--surface-2)}
+.va-row.on{background:var(--accent-soft);border-left-color:var(--accent)}
+.va-row.dim .nm{color:var(--muted)}
+.va-row .rs{font-size:11px;color:var(--muted);border:1px solid var(--line);border-radius:3px;padding:0 4px;margin-left:auto;margin-right:6px}
+.va-detail{min-width:0;display:flex;flex-direction:column;gap:22px}
+@media (max-width:760px){.va{grid-template-columns:1fr}.va-list{position:static;max-height:none}}
+.dt-head{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between}
+.dt-title{font-size:19px;font-weight:700;margin:0}
+.src{font-family:var(--font-mono);font-size:12px;color:var(--muted)}
+.blk h3{margin:0 0 8px;font-size:13px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.blk h3 .tag{font-size:11px;text-transform:none;letter-spacing:0;border:1px dashed var(--line);border-radius:4px;padding:0 6px;font-weight:400}
+.blk-bar{display:flex;justify-content:space-between;gap:10px;align-items:end;flex-wrap:wrap;margin-bottom:8px}
+.blk-bar h3{margin:0}
+.dt-search{border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:6px;padding:6px 10px;font:inherit;font-size:14px;width:200px;max-width:100%}
+.tbl-scroll{overflow-x:auto;border:1px solid var(--line);border-radius:6px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:14px;font-variant-numeric:tabular-nums}
+.res table{width:auto;min-width:min(420px,100%)}
+th{text-align:left;font-weight:600;background:var(--surface-2);padding:7px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:6px 10px;border-bottom:1px solid var(--line)}
+tr:last-child td{border-bottom:0}
+td.num,th.num{text-align:right}
+.res tfoot td{font-weight:700;background:var(--surface-2);border-top:1px solid var(--line)}
+.pager{display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-top:8px;font-size:13px;color:var(--muted)}
+.pager button{border:1px solid var(--line);background:var(--surface);border-radius:4px;padding:2px 8px}
+.empty{padding:28px;text-align:center;color:var(--muted);border:1px dashed var(--line);border-radius:6px;background:var(--surface)}
+.empty.err{color:var(--st-err);border-color:var(--st-err)}
+.note{font-size:13px;color:var(--muted);margin:0}
+
+.proto-bar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:30;display:flex;align-items:center;gap:4px;background:var(--bar);color:var(--bar-fg);border-radius:999px;padding:6px;box-shadow:0 6px 24px rgb(0 0 0 / .25);max-width:calc(100% - 32px)}
+.proto-bar button{background:none;border:0;color:inherit;width:34px;height:34px;border-radius:50%;font-size:18px;flex:none}
+.proto-bar button:hover{background:rgb(127 127 127 / .25)}
+.proto-bar .lbl{padding:0 10px;font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.proto-bar .lbl small{font-weight:400;opacity:.7;margin-left:6px}
+@media (prefers-reduced-motion:no-preference){.va-row,.tabs button{transition:background .12s}}
+</style>
+
+<header class="nav">
+  <div class="wrap nav-in">
+    <span class="brand">analise.corredor</span>
+    <nav class="tabs" aria-label="Páginas">
+      <button type="button" data-pg="analise" id="tab-analise">Análise</button>
+      <button type="button" data-pg="sintese" id="tab-sintese">Síntese</button>
+    </nav>
+    <div class="nav-actions">
+      <button class="btn" type="button" id="bt-xlsx">Planilha de conferência</button>
+      <button class="btn primary" type="button" id="bt-docx">Síntese (.docx)</button>
+    </div>
+  </div>
+</header>
+
+<main id="page"></main>
+
+<div class="proto-bar" role="toolbar" aria-label="Simular estado do protótipo">
+  <button type="button" id="prev" aria-label="Estado anterior">‹</button>
+  <span class="lbl" id="lbl"></span>
+  <button type="button" id="next" aria-label="Próximo estado">›</button>
+</div>
+
+<script>
+// ---------- dados fictícios ----------
+const temas = [
+  {id:'municipios',grupo:'Infraestrutura',nome:'Municípios',fonte:'TEMA_MUNICIPIOS',estado:'com',cols:['Município','UF'],rows:[['Município A','UF1'],['Município B','UF1'],['Município C','UF1'],['Município D','UF2'],['Município E','UF2'],['Município F','UF2']],resumo:{por:['UF']}},
+  {id:'areas_urbanas',grupo:'Infraestrutura',nome:'Áreas Urbanas',fonte:'TEMA_AREAS_URBANAS',estado:'sem'},
+  {id:'lt',grupo:'Infraestrutura',nome:'Linhas de Transmissão',fonte:'TEMA_LINHAS_TRANSMISSAO',estado:'com',cols:['Linha de Transmissão','Status','Fonte'],rows:[['LT 500 kV Exemplo Norte – Exemplo Sul, C1','Planejada','Estudo']]},
+  {id:'se',grupo:'Infraestrutura',nome:'Subestações',fonte:'TEMA_SUBESTACOES',estado:'sem'},
+  {id:'usinas',grupo:'Infraestrutura',nome:'Usinas',fonte:'TEMA_USINAS',estado:'com',cols:['Usina','Tipo','Município','Rio','Potência (kW)','Estágio'],num:[4],rows:[['Usina Exemplo','PCH','Município D','Rio Exemplo','12.640','Eixo Disponível']]},
+  {id:'gas_transp',grupo:'Infraestrutura',nome:'Gasoduto Transporte',fonte:'TEMA_GASODUTO_TRANSPORTE',estado:'sem'},
+  {id:'dutos_esc',grupo:'Infraestrutura',nome:'Dutos Escoamento',fonte:'TEMA_DUTO_ESCOAMENTO',estado:'sem'},
+  {id:'gas_dist',grupo:'Infraestrutura',nome:'Gasoduto Distribuição',fonte:'TEMA_GASODUTO_DISTRIBUICAO',estado:'sem'},
+  {id:'rodovias',grupo:'Transportes',nome:'Rodovias (OSM)',fonte:'TEMA_RODOVIAS',estado:'com',cols:['Código','Nome','Categoria OSM'],rows:[],resumo:{por:['Categoria OSM']}},
+  {id:'aerodromos',grupo:'Transportes',nome:'Aeródromos',fonte:'TEMA_AERODROMOS',estado:'com',cols:['Aeródromo','Município','Comprimento da pista (m)'],num:[2],rows:[['Fazenda Alfa','Município A','1.500'],['Fazenda Beta','Município E','900'],['Fazenda Gama','Município C','1.350'],['Fazenda Delta','Município F','1.500']]},
+  {id:'ferrovias',grupo:'Transportes',nome:'Ferrovias',fonte:'TEMA_FERROVIAS',estado:'err',erro:'Não foi possível consultar a fonte do tema.'},
+  {id:'mapbiomas',grupo:'Uso do Solo',nome:'MapBiomas',fonte:'MAPBIOMAS_TILES',estado:'com',agregado:true,cols:['Classe','% da área de estudo'],num:[1],rows:[['Soja','42,62'],['Formação Savânica','36,62'],['Formação Florestal','8,76'],['Mosaico de Usos','6,54'],['Algodão','4,00'],['Pastagem','0,73'],['Outras Áreas Não Vegetadas','0,26'],['Silvicultura','0,16'],['Formação Campestre','0,13'],['Outras Lavouras Temporárias','0,06'],['Rio, Lago e Oceano','0,06'],['Campo Alagado e Área Pantanosa','0,05'],['Área Urbanizada','0,01']]},
+  {id:'hidro',grupo:'Meio Físico',nome:'Hidrografia',fonte:'TEMA_HIDROGRAFIA',estado:'com',cols:['Curso d\'água','Ordem'],num:[1],rows:[['Rio Exemplo','5'],['Rio Principal','7'],['Riacho Fundo','2'],['Riacho do Meio','2'],['Rio Vermelho','4']]},
+  {id:'cavernas',grupo:'Meio Físico',nome:'Cavernas',fonte:'TEMA_CAVERNAS',estado:'sem'},
+  {id:'pm',grupo:'Processos Minerários',nome:'Processos Minerários',fonte:'TEMA_PROCESSOS_MINERARIOS',estado:'com',cols:['Processo','Fase','Substância','Área (ha)'],num:[3],rows:[['000.001/2019','Requerimento de Pesquisa','Areia','48,20'],['000.002/2021','Autorização de Pesquisa','Calcário','1.212,75'],['000.003/2018','Autorização de Pesquisa','Calcário','310,40'],['000.004/2022','Requerimento de Lavra','Areia','95,00']],resumo:{por:['Fase','Substância']}},
+  {id:'ti',grupo:'Áreas Protegidas',nome:'Terras Indígenas',fonte:'TEMA_TERRAS_INDIGENAS',estado:'sem'},
+  {id:'tq',grupo:'Áreas Protegidas',nome:'Terras Quilombolas',fonte:'TEMA_TERRAS_QUILOMBOLAS',estado:'sem'},
+  {id:'pa',grupo:'Áreas Protegidas',nome:'Projetos de Assentamento',fonte:'TEMA_ASSENTAMENTOS',estado:'sem'},
+  {id:'uc',grupo:'Áreas Protegidas',nome:'Unidades de Conservação',fonte:'TEMA_UNIDADES_CONSERVACAO',estado:'sem'},
+  {id:'uc_comp',grupo:'Áreas Protegidas',nome:'UC (base complementar)',fonte:'TEMA_UNIDADES_CONSERVACAO_COMPLEMENTAR',estado:'sem'},
+  {id:'sitios',grupo:'Áreas Protegidas',nome:'Sítios Arqueológicos',fonte:'TEMA_SITIOS_ARQUEOLOGICOS',estado:'com',cols:['Sítio','Município','Tipo'],rows:[['Sítio 1','Município C','Lítico'],['Sítio 2','Município C','Cerâmico'],['Sítio 3','Município A','Rupestre'],['Sítio 4','Município F','Lítico'],['Sítio 5','Município D','Lítico'],['Sítio 6','Município E','Cerâmico']],resumo:{por:['Tipo']}}
+];
+(() => { const r = temas.find(t => t.id==='rodovias');
+  r.rows.push(['BR-000;XX-001','','primária'],['BR-000;XX-001','','primária'],['XX-002','','primária']);
+  const cat = ['terciária','não classificada','trilha/estrada vicinal','não classificada','trilha/estrada vicinal'];
+  for (let i = 0; r.rows.length < 42; i++) r.rows.push(['', i % 4 === 0 ? 'Estrada da Fazenda ' + (i+1) : '', cat[i % cat.length]]);
+})();
+temas.forEach(t => { t.n = t.rows ? t.rows.length : 0; });
+const grupos = [...new Set(temas.map(t => t.grupo))];
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const T = {com: temas.filter(t=>t.estado==='com').length, sem: temas.filter(t=>t.estado==='sem').length, err: temas.filter(t=>t.estado==='err').length};
+
+// ---------- estados simulados ----------
+const estados = [
+  ['vazio','Nada carregado'],
+  ['linha','Linha carregada, sem distância'],
+  ['linha_ok','Linha + distância'],
+  ['poligono','Polígono pronto carregado'],
+  ['analisado','Análise concluída']
+];
+let ie = 4, pg = 'analise', sel = 'pm', filtro = 'todos', dist = '2,5';
+const camadas = {area:true, tracado:true, mun:true, rod:true, hid:true, pm:true, sit:true, aer:true};
+
+// ---------- Análise ----------
+function paginaAnalise(el){
+  const st = estados[ie][0];
+  const temArq = st !== 'vazio', poli = st === 'poligono', analisado = st === 'analisado';
+  const d = st === 'linha' ? '' : dist;
+  const pode = temArq && (poli || d !== '');
+  const arquivo = poli ? 'corredor_exemplo.gpkg' : 'LT_exemplo.kmz';
+  el.innerHTML = `<div class="an">
+  <aside class="side" aria-label="Parâmetros da análise">
+    <div class="step"><h3>Traçado ou área de estudo</h3>
+      ${temArq ? `<div class="file"><span class="fn">${arquivo}</span><button type="button" aria-label="Remover arquivo">✕</button></div>
+        ${poli ? `<div style="margin-top:8px"><label class="lb" for="camada">Camada</label><select id="camada" class="field"><option>corredor_v3</option><option>corredor_v2</option><option>vertices</option></select><div class="hint">O arquivo tem 3 camadas. Escolha uma.</div></div>` : ''}
+        <div class="det"><span class="geo">${poli ? '▭ Polígono' : '╱ Linha'}</span>${poli ? '1 feição · 218,4 km²' : '1 feição · 214,6 km'}</div>`
+      : `<div class="drop"><b>Escolha um arquivo</b><br>.zip (shapefile ou .gdb), .kml, .kmz ou .gpkg</div>`}
+    </div>
+    <div class="step"><h3>Distância de buffer</h3>
+      <label class="lb" for="dist">Distância (km)</label>
+      <input id="dist" class="field" inputmode="decimal" placeholder="ex.: 2,5 ou 0,04" value="${poli ? '' : esc(d)}" ${poli || !temArq ? 'disabled' : ''}>
+      <div class="hint ${temArq && !poli && d==='' ? 'req' : ''}">${!temArq ? 'Habilitada para ponto ou linha.' : poli ? 'Polígono enviado: usado como veio, sem buffer.' : d==='' ? 'Obrigatória para ponto ou linha. Qualquer valor positivo.' : 'Aplicada a todos os temas.'}</div>
+    </div>
+    <button type="button" class="btn primary block" id="bt-analisar" ${pode ? '' : 'disabled'}>${analisado ? 'Analisar de novo' : 'Analisar'}</button>
+    ${analisado ? `<div class="done"><div class="row"><span class="pill com"><span class="dot"></span>${T.com} com interferência</span><span class="pill sem">${T.sem} sem</span><span class="pill err"><span class="dot"></span>${T.err} não verificado</span></div><button type="button" class="linkbtn" id="ir-sintese">Ver síntese →</button></div>` : ''}
+  </aside>
+  <section class="mapwrap" aria-label="Mapa">${mapa(st)}</section></div>`;
+  const de = el.querySelector('#dist'); if (de) de.addEventListener('input', e => { dist = e.target.value; });
+  const ir = el.querySelector('#ir-sintese'); if (ir) ir.onclick = () => irPara('sintese');
+  const ba = el.querySelector('#bt-analisar'); if (ba) ba.onclick = () => { ie = 4; render(); };
+  el.querySelectorAll('.layers input').forEach(cb => cb.onchange = e => { camadas[e.target.dataset.l] = e.target.checked; render(); });
+}
+
+function mapa(st){
+  if (st === 'vazio') return `<div class="mapempty">Carregue um traçado ou uma área de estudo para vê-lo no mapa.</div>`;
+  const an = st === 'analisado', linhaSo = st === 'linha', poli = st === 'poligono';
+  const trac = 'M70,470 C200,420 260,330 380,300 S560,200 640,170 S780,110 860,80';
+  const L = (k, s) => (camadas[k] ? s : '');
+  const lista = [['area','Área de estudo','var(--l-area)'],['tracado','Traçado','var(--l-tracado)']].concat(an ? [['mun','Municípios','var(--l-mun)'],['rod','Rodovias (OSM)','var(--l-rod)'],['hid','Hidrografia','var(--l-hid)'],['pm','Processos Minerários','var(--l-pm)'],['sit','Sítios Arqueológicos','var(--l-sit)'],['aer','Aeródromos','var(--l-aer)']] : []);
+  return `<svg viewBox="0 0 940 560" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Mapa esquemático do corredor">
+    <rect width="940" height="560" fill="var(--map-bg)"/>
+    ${an ? L('mun', `<g fill="none" stroke="var(--l-mun)" stroke-width="1.2" stroke-dasharray="6 5"><path d="M0,250 C150,280 260,240 330,330 S380,520 420,560"/><path d="M330,330 C450,300 520,330 600,260 S700,230 760,0"/><path d="M600,260 C690,320 820,300 940,340"/></g>
+      <g font-size="13" fill="var(--l-mun)" font-family="var(--font-body)"><text x="90" y="200">Município A · UF1</text><text x="430" y="420">Município C · UF1</text><text x="700" y="420">Município D · UF2</text></g>`) : ''}
+    ${!linhaSo ? L('area', poli
+      ? `<path d="M60,440 C190,385 250,300 370,272 S550,170 630,140 S780,78 870,50 L880,110 C800,140 720,175 650,200 S470,330 390,330 S220,460 80,505 Z" fill="var(--l-area)" fill-opacity=".16" stroke="var(--l-area)" stroke-width="2"/>`
+      : `<path d="${trac}" fill="none" stroke="var(--l-area)" stroke-opacity=".18" stroke-width="64" stroke-linecap="round" stroke-linejoin="round"/><path d="${trac}" fill="none" stroke="var(--l-area)" stroke-opacity=".7" stroke-width="1.5" stroke-dasharray="2 0" transform="translate(0,0)" style="display:none"/>`) : ''}
+    ${an ? L('hid', `<g fill="none" stroke="var(--l-hid)" stroke-width="2.2"><path d="M250,0 C270,120 300,260 290,400 S330,520 360,560"/><path d="M560,560 C570,430 620,300 700,220 S860,160 940,170"/></g>`) : ''}
+    ${an ? L('rod', `<g fill="none" stroke="var(--l-rod)" stroke-width="3"><path d="M0,380 L940,250"/><path d="M520,0 L470,560"/></g><g fill="none" stroke="var(--l-rod)" stroke-width="1.2" stroke-dasharray="4 3"><path d="M150,560 L240,330 L180,120"/><path d="M700,560 L720,330 L820,180"/></g>`) : ''}
+    ${an ? L('pm', `<g fill="var(--l-pm)" fill-opacity=".25" stroke="var(--l-pm)" stroke-width="1.5"><path d="M330,250 h80 v70 h-80 z"/><path d="M600,150 h70 v55 h-70 z"/><path d="M180,390 h60 v50 h-60 z"/><path d="M760,70 h55 v45 h-55 z"/></g>`) : ''}
+    ${(!poli || true) ? L('tracado', poli ? '' : `<path d="${trac}" fill="none" stroke="var(--l-tracado)" stroke-width="2.5"/>`) : ''}
+    ${an ? L('sit', `<g fill="var(--l-sit)" stroke="var(--map-bg)" stroke-width="2">${[[140,445],[300,355],[455,290],[540,235],[690,175],[810,105]].map(([x,y])=>`<circle cx="${x}" cy="${y}" r="6.5"/>`).join('')}</g>`) : ''}
+    ${an ? L('aer', `<g fill="var(--l-aer)">${[[205,420],[420,300],[620,195],[835,85]].map(([x,y])=>`<path d="M${x},${y-9} l8,14 h-16 z"/>`).join('')}</g>`) : ''}
+  </svg>
+  <div class="layers"><h4>Camadas</h4>${lista.map(([k,n,c]) => `<label><input type="checkbox" data-l="${k}" ${camadas[k]?'checked':''} ${(k==='area'&&linhaSo)||(k==='tracado'&&poli)?'disabled':''}><span class="sw" style="background:${c}"></span>${n}</label>`).join('')}</div>
+  <div class="mapnote">Mapa esquemático. No app: leaflet com mapa-base.</div>`;
+}
+
+// ---------- Síntese ----------
+function pill(t){
+  if (t.estado==='com') return `<span class="pill com"><span class="dot"></span>${t.n} ${t.n===1?'interferência':'interferências'}</span>`;
+  if (t.estado==='err') return `<span class="pill err"><span class="dot"></span>não verificado</span>`;
+  return `<span class="pill sem">sem interferência</span>`;
+}
+const pillCurta = t => t.estado==='com' ? `<span class="pill com">${t.n}</span>` : t.estado==='err' ? `<span class="pill err">!</span>` : `<span class="pill sem">0</span>`;
+
+function calcResumo(t){
+  const idx = t.resumo.por.map(c => t.cols.indexOf(c));
+  const m = new Map();
+  t.rows.forEach(r => { const k = idx.map(i => r[i]).join('\u0000'); m.set(k, (m.get(k)||0) + 1); });
+  return [...m.entries()].sort((a,b) => b[1]-a[1]).map(([k,n]) => k.split('\u0000').concat(String(n)));
+}
+
+function paginaSintese(el){
+  if (estados[ie][0] !== 'analisado'){ el.innerHTML = `<div class="wrap" style="padding-block:40px"><div class="empty">A síntese aparece depois da análise. Carregue um traçado e clique em <b>Analisar</b> na página Análise.</div></div>`; return; }
+  el.innerHTML = `<div class="wrap">
+    <div class="ctx"><h1>LT Exemplo Norte – Exemplo Sul</h1><span class="meta">Corredor · buffer 2,5 km · 218,4 km² · 21/10/2026 14:32</span><span class="ex">dados fictícios</span></div>
+    <div class="alert" role="status"><span class="dot" style="margin-top:6px"></span><div><b>1 tema não verificado:</b> Ferrovias. A consulta falhou, então este tema não aparece como "sem interferência".</div></div>
+    <div class="va"><aside class="va-list" aria-label="Temas">
+      <div class="va-filter">${[['todos','Todos ('+temas.length+')'],['com','Com interferência ('+T.com+')'],['err','Não verificados ('+T.err+')']].map(([k,l])=>`<button type="button" data-f="${k}" class="${filtro===k?'on':''}">${l}</button>`).join('')}</div>
+      <div class="va-scroll">${grupos.map(g => { const ts = temas.filter(t => t.grupo===g && (filtro==='todos' || t.estado===filtro)); if (!ts.length) return '';
+        return `<div class="va-grp">${esc(g)}</div>` + ts.map(t => `<button type="button" class="va-row ${t.id===sel?'on':''} ${t.estado==='sem'?'dim':''}" data-id="${t.id}"><span class="nm">${esc(t.nome)}</span>${t.resumo && t.estado==='com' ? '<span class="rs" title="Tem resumo">Σ</span>' : ''}${pillCurta(t)}</button>`).join(''); }).join('')}</div>
+    </aside><section class="va-detail" id="det"></section></div></div>`;
+  detalhe(el.querySelector('#det'), temas.find(t => t.id===sel));
+  el.querySelector('.va-filter').onclick = e => { const f = e.target.dataset.f; if (f){ filtro = f; render(); } };
+  el.querySelector('.va-scroll').onclick = e => { const b = e.target.closest('[data-id]'); if (b){ sel = b.dataset.id; render(); } };
+}
+
+function detalhe(el, t){
+  let h = `<div class="dt-head"><div><h2 class="dt-title">${esc(t.nome)}</h2><div class="src">${esc(t.fonte)}</div></div>${pill(t)}</div>`;
+  if (t.estado==='err'){ el.innerHTML = h + `<div class="empty err">${esc(t.erro)}<br>Verifique o acesso à fonte e rode a análise de novo.</div>`; return; }
+  if (!t.rows){ el.innerHTML = h + `<div class="empty">Nenhuma feição deste tema intersecta a área de estudo.</div>`; return; }
+  if (t.resumo){
+    const rr = calcResumo(t), cols = t.resumo.por.concat('Interferências');
+    h += `<div class="blk res"><h3>Resumo <span class="tag">regra provisória: contagem por ${t.resumo.por.join(' e ')}</span></h3>
+      <div class="tbl-scroll" style="display:inline-block;max-width:100%"><table><thead><tr>${cols.map((c,i)=>`<th class="${i===cols.length-1?'num':''}">${esc(c)}</th>`).join('')}</tr></thead>
+      <tbody>${rr.map(r => `<tr>${r.map((v,i)=>`<td class="${i===r.length-1?'num':''}">${esc(v)}</td>`).join('')}</tr>`).join('')}</tbody>
+      <tfoot><tr><td colspan="${cols.length-1}">Total</td><td class="num">${t.n}</td></tr></tfoot></table></div></div>`;
+  }
+  h += `<div class="blk"><div class="blk-bar"><h3>${t.agregado ? 'Resultado' : 'Tabela de resultado'}</h3><input class="dt-search" id="busca" type="search" placeholder="Filtrar linhas" aria-label="Filtrar linhas"></div>
+    ${t.agregado ? `<p class="note" style="margin-bottom:8px">O resultado deste tema já é uma agregação (% da área de estudo por classe).</p>` : ''}
+    <div class="tbl-scroll"><table><thead><tr>${t.cols.map((c,i)=>`<th class="${(t.num||[]).includes(i)?'num':''}">${esc(c)}</th>`).join('')}</tr></thead><tbody></tbody></table></div><div class="pager"></div></div>`;
+  if (!t.resumo && !t.agregado) h += `<p class="note">Este tema ainda não tem resumo definido.</p>`;
+  el.innerHTML = h;
+  const tb = el.querySelector('.blk:last-of-type tbody') || el.querySelectorAll('tbody')[el.querySelectorAll('tbody').length-1];
+  const pgEl = el.querySelector('.pager'), q = el.querySelector('#busca'); let p = 0; const por = 10;
+  function draw(){
+    const f = q.value.toLowerCase(), rows = t.rows.filter(r => r.join(' ').toLowerCase().includes(f));
+    const np = Math.max(1, Math.ceil(rows.length/por)); p = Math.min(p, np-1);
+    tb.innerHTML = rows.slice(p*por, p*por+por).map(r => `<tr>${r.map((v,i)=>`<td class="${(t.num||[]).includes(i)?'num':''}">${esc(v||'—')}</td>`).join('')}</tr>`).join('') || `<tr><td colspan="${t.cols.length}" style="color:var(--muted)">Nenhuma linha com esse filtro.</td></tr>`;
+    pgEl.innerHTML = rows.length > por ? `<span>${p*por+1}–${Math.min(rows.length,p*por+por)} de ${rows.length}</span><button type="button" ${p===0?'disabled':''} data-d="-1">Anterior</button><button type="button" ${p>=np-1?'disabled':''} data-d="1">Próxima</button>` : `<span>${rows.length} ${rows.length===1?'linha':'linhas'}</span>`;
+  }
+  pgEl.onclick = e => { const d = e.target.dataset.d; if (d){ p += +d; draw(); } };
+  q.oninput = () => { p = 0; draw(); };
+  draw();
+}
+
+// ---------- navegação ----------
+function irPara(x){ pg = x; render(); window.scrollTo(0,0); }
+function render(){
+  const an = estados[ie][0]==='analisado';
+  document.getElementById('tab-analise').classList.toggle('on', pg==='analise');
+  document.getElementById('tab-sintese').classList.toggle('on', pg==='sintese');
+  document.getElementById('tab-sintese').innerHTML = 'Síntese' + (an ? `<span class="cnt">${T.com}/${temas.length}</span>` : '');
+  ['bt-xlsx','bt-docx'].forEach(id => document.getElementById(id).disabled = !an);
+  document.getElementById('lbl').innerHTML = `Estado ${ie+1}/${estados.length}<small>${estados[ie][1]}</small>`;
+  const el = document.getElementById('page');
+  pg==='analise' ? paginaAnalise(el) : paginaSintese(el);
+  try { history.replaceState(null, '', '#' + pg); } catch(e){}
+}
+document.querySelector('.tabs').onclick = e => { const b = e.target.closest('[data-pg]'); if (b) irPara(b.dataset.pg); };
+function mover(d){ ie = (ie + d + estados.length) % estados.length; render(); }
+document.getElementById('prev').onclick = () => mover(-1);
+document.getElementById('next').onclick = () => mover(1);
+document.addEventListener('keydown', e => {
+  if (e.target.closest('input,textarea,select,[contenteditable]')) return;
+  if (e.key==='ArrowLeft') mover(-1); if (e.key==='ArrowRight') mover(1);
+});
+['bt-xlsx','bt-docx'].forEach(id => document.getElementById(id).onclick = e => { const b = e.currentTarget, o = b.textContent; b.textContent = 'Protótipo: sem exportação'; setTimeout(() => b.textContent = o, 1400); });
+if (location.hash === '#sintese') pg = 'sintese';
+render();
+</script>

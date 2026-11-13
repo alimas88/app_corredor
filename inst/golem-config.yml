@@ -1,0 +1,56 @@
+default:
+  golem_name: analise.corredor
+  golem_version: 0.0.0.9000
+  app_prod: no
+
+  # Conexão ao banco de dados (SQL Server via ODBC). Os valores vêm de
+  # variáveis de ambiente, definidas no .Renviron (fora do controle de versão):
+  #   ANALISE_BD_DRIVER, ANALISE_BD_SERVER, ANALISE_BD_DATABASE
+  bd:
+    driver: !expr Sys.getenv("ANALISE_BD_DRIVER", "ODBC Driver 18 for SQL Server")
+    server: !expr Sys.getenv("ANALISE_BD_SERVER")
+    database: !expr Sys.getenv("ANALISE_BD_DATABASE")
+
+  # Nome da tabela (ou view) de cada tema no BD.
+  # Os valores abaixo são exemplos: substitua pelos nomes do seu banco.
+  temas:
+    municipios: TEMA_MUNICIPIOS
+    areas_urbanas: TEMA_AREAS_URBANAS
+    linhas_transmissao: TEMA_LINHAS_TRANSMISSAO
+    subestacoes: TEMA_SUBESTACOES
+    usinas: TEMA_USINAS
+    gasoduto_transporte: TEMA_GASODUTO_TRANSPORTE
+    duto_escoamento: TEMA_DUTO_ESCOAMENTO
+    gasoduto_distribuicao: TEMA_GASODUTO_DISTRIBUICAO
+    rodovias: TEMA_RODOVIAS
+    aerodromos: TEMA_AERODROMOS
+    ferrovias: TEMA_FERROVIAS
+    cavernas: TEMA_CAVERNAS
+    processos_minerarios: TEMA_PROCESSOS_MINERARIOS
+    terras_indigenas: TEMA_TERRAS_INDIGENAS
+    terras_quilombolas: TEMA_TERRAS_QUILOMBOLAS
+    assentamentos: TEMA_ASSENTAMENTOS
+    uc: TEMA_UNIDADES_CONSERVACAO
+    uc_complementar: TEMA_UNIDADES_CONSERVACAO_COMPLEMENTAR
+    rppn: TEMA_RPPN
+    sitios_arqueologicos: TEMA_SITIOS_ARQUEOLOGICOS
+    mapbiomas: MAPBIOMAS_TILES
+    declividade: DECLIVIDADE_TILES
+
+  # Coleção do MapBiomas gravada na tabela `temas$mapbiomas`
+  mapbiomas_colecao: 11
+
+  # Filtro opcional de linhas para o tema de linhas de transmissão, como
+  # expressão R em texto (ex.: "situacao == 'Ativo'"). Vazio = sem filtro.
+  filtro_linhas_transmissao: ~
+
+  # Tema ainda lido de arquivo (geodatabase), e não do BD.
+  # Caminho via variável de ambiente ANALISE_GDB_HIDROGRAFIA.
+  hidrografia:
+    gdb: !expr Sys.getenv("ANALISE_GDB_HIDROGRAFIA")
+    layer: TEMA_HIDROGRAFIA
+
+production:
+  app_prod: yes
+dev:
+  golem_wd: !expr golem::pkg_path()

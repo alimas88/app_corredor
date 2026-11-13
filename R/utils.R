@@ -1,0 +1,9 @@
+# utils para variáveis globais
+
+if(getRversion() >= "2.15.1") {
+  utils::globalVariables(c("wkt", "GDB_GEOMATTR_DATA", "class_id",
+                           "legenda_mapbiomas", "level", "percentagem",
+                           "CHARACTER_MAXIMUM_LENGTH", "COLUMN_NAME"))
+}
+
+

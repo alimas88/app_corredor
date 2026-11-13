@@ -1,0 +1,18 @@
+/* Esconde o título padrão */
+.skin-blue .main-header .logo {
+  visibility: hidden;
+}
+
+/* Adiciona um novo título centralizado na barra azul */
+.skin-blue .main-header::after {
+  content: "Análise de sobreposições - Relatório R1";
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  top: 12px; /* ajuste fino vertical */
+  font-size: 20px;
+  font-weight: bold;
+  color: white; /* ou outra cor de destaque */
+  z-index: 1000;
+}
+

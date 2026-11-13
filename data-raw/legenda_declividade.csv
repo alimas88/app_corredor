@@ -1,0 +1,7 @@
+class_id,descricao,lim_inf,lim_sup,color
+1,Plano,0,3,#38A800
+2,Suave ondulado,3,8,#AAFF00
+3,Ondulado,8,20,#FFFF73
+4,Forte ondulado,20,45,#FFAA00
+5,Montanhoso,45,75,#FF5500
+6,Escarpado,75,,#A80000
