@@ -31,7 +31,7 @@ Registro das decisões da sessão de definição de 21/10/2026, atualizado em 10
 - **"Gerar área de estudo"** (custo baixo: um `st_buffer`) desenha o polígono no mapa e mostra a área em km². Com polígono pronto, o rótulo muda para "Carregar área de estudo", porque não há buffer a aplicar.
 - **"Analisar"** (custo alto: ~20 consultas + rasters) roda os temas. Fica desabilitado até existir uma área de estudo.
 - **Por que separar:** um `reactive()` sobre o campo de distância dispararia a cada tecla (`2`, `2,`, `2,5`), gerando buffers com valores inválidos e análises repetidas. A separação também deixa barato testar várias distâncias, que era o motivo de trazer o buffer para dentro do app, e expõe erro de digitação (25 em vez de 2,5) no mapa antes de pagar as consultas.
-- **Implementação:** `eventReactive(input$gerar, ...)` para a área de estudo e `eventReactive(input$analisar, ...)` para os resultados. A validação da distância fica em um `reactive()` separado, com `validate(need(x > 0, ...))`, que avisa no campo enquanto a pessoa digita sem calcular nada. Um `observeEvent(area_estudo(), { registro(list()) })` descarta a síntese anterior quando a área muda.
+- **Implementação:** `eventReactive(input$gerar, ...)` para a área de estudo e `eventReactive(input$analisar, ...)` para os resultados. A validação da distância fica em um `reactive()` separado, com `validate(need(x > 0, ...))`, que avisa no campo enquanto a pessoa digita sem calcular nada. Não é preciso limpar o registro quando a área muda: cada tema é um `reactive` da área de estudo, criado uma vez (ver "Situação do tema e módulo genérico").
 - **Campo de distância:** `numericInput` não serve, porque devolve `NA` para `2,5`. Usar `textInput` com parsing (`str_replace(",", ".")` + `as.numeric`) ou `shinyWidgets::autonumericInput`, que já trata o formato pt-BR.
 
 ### Rasters no SQL Server: tiles GeoTIFF
@@ -43,7 +43,7 @@ Registro das decisões da sessão de definição de 21/10/2026, atualizado em 10
 - **Carga:** `data-raw/carga_mapbiomas_col11_2025.R`. Resultado da carga da Coleção 11 (2025): ~9.700 tiles, ~660 MB de GeoTIFF, todos com MD5 conferido. O raster equivalente em geodatabase, sem compressão, ocupa cerca de 20 GB.
 - **Leitura:** `contar_raster_bd()` (`R/fct_raster_bd.R`) busca os tiles que intersectam o polígono da área de estudo, monta um mosaico virtual (VRT) e conta os pixels por classe com `crop(mask = TRUE, touches = FALSE)` + `freq()`. Validada em 11/11/2026 contra o `.tif` original em quatro áreas (corredores, litoral e canto entre tiles), com contagens idênticas.
 - **Contagem no `terra`, não `extract`:** num corredor de 10,5 milhões de pixels, o `extract` + `count` levou 28,6 s no `.tif` local, contra 7,7 s do `crop` + `mask` + `freq`. A regra `touches = FALSE` (pixel entra se o centro está na área) é a mesma do `extract`; com `touches = TRUE`, o padrão do `mask`, entram ~0,2% a mais de pixels, os da borda. As duas formas diferiram em 1 pixel em 10,5 milhões, um empate de centro sobre a borda.
-- **Módulo:** `mod_raster_bd` (`R/mod_raster_bd.R`), genérico para qualquer raster de classes em tiles no BD (decisão de 12/11/2026: o `mod_uso_solo` foi renomeado e generalizado, em vez de ganhar uma cópia para a declividade). Recebe `tabela`, `legenda` (`class_id`, `descricao`, `color` e colunas extras a exibir), `tema` (nome usado nas mensagens), `ordem` ("percentagem" decrescente ou "classe", a ordem da legenda) e `todas_classes` (inclui com 0 as classes ausentes na área). A legenda é preparada no `app_server.R`.
+- **Função:** `resumir_raster_bd()` (`R/fct_raster_bd.R`), genérica para qualquer raster de classes em tiles no BD, exibida pelo `mod_tema` (decisão de 12/11/2026, revista em 13/11/2026: o `mod_raster_bd` virou função pura, ver "Situação do tema e módulo genérico"). Recebe `tabela`, `legenda` (`class_id`, `descricao`, `color` e colunas extras a exibir), `tema` (nome usado nas mensagens), `ordem` ("percentagem" decrescente ou "classe", a ordem da legenda) e `todas_classes` (inclui com 0 as classes ausentes na área). A legenda é preparada no `app_server.R` e conferida por `validar_legenda()`.
 - **Outros softwares:** ArcGIS e QGIS enxergam a tabela só como polígonos (o contorno dos tiles). Ela é feita para o app.
 - **FME:** os writers de SQL Server do FME não gravam raster. Se a atualização passar para o FME, o caminho é `RasterTiler` + `RasterExtractor` (GeoTIFF) + writer MSSQL, mantendo a mesma estrutura de tabela.
 
@@ -52,7 +52,7 @@ Registro das decisões da sessão de definição de 21/10/2026, atualizado em 10
 - **Estrutura:** `legenda_mapbiomas` empilha as legendas de todas as coleções, com as colunas `colecao`, `class_id`, `level`, `descricao` e `color` (decisão de 10/11/2026, revista em 11/11/2026: saiu `descricao_en`, que nenhuma das legendas guardadas tem). Cada coleção mantém a estrutura da Coleção 10. As coleções antigas não são apagadas, para permitir análises comparativas entre versões.
 - **Fontes:** os CSVs ficam em `data-raw/legendas_mapbiomas/`, um por coleção (`colecao_<n>.csv`), todos no mesmo formato (`class_id`, `level`, `descricao`, `color`, UTF-8), e são permanentes. A Coleção 10 foi exportada do `.rda` anterior. A Coleção 11 foi montada a partir do PDF oficial (de 13/08/2026), porque o CSV oficial só tem as 33 classes finais, sem nível, e tem erros de grafia. `data-raw/atualizacao_legenda.R` lê todos os `colecao_<n>.csv` da pasta, sem download, confere e gera o `.rda`.
 - **Coleção 11 (montada em 11/11/2026):** 41 classes (33 finais e 8 agregadoras), com `level` de 1 a 4, nomes e cores do PDF, na ordem hierárquica dele. Na classe 22, mantida a grafia da Coleção 10, "Área não Vegetada" (o PDF usa "não vegetada"). Em relação à Coleção 10: 5 classes novas (7, 77, 84, 75, 91), 1 removida (27, "Não observado"), 1 renomeada (50, "Restinga Herbácea ou Arbustiva") e cores diferentes nas classes 1, 6, 10, 14, 26, 29 e 50 (29 e 50 trocaram de cor entre si).
-- **Uso no app:** o `app_server.R` filtra a `legenda_mapbiomas` pela coleção configurada (`mapbiomas_colecao` no `golem-config.yml`) e passa o resultado ao `mod_raster_bd`. Uma legenda vazia (coleção sem legenda) impede a análise, com mensagem.
+- **Uso no app:** o `app_server.R` filtra a `legenda_mapbiomas` pela coleção configurada (`mapbiomas_colecao` no `golem-config.yml`) e passa o resultado ao `resumir_raster_bd()`. Uma legenda vazia (coleção sem legenda) impede a análise, com mensagem.
 - **Nova coleção (provisório):** montar o `colecao_<n>.csv` no formato padrão a partir da legenda oficial, salvar na pasta, rodar o script e trocar a tabela e a coleção no `golem-config.yml`. Esse fluxo ainda exige publicar o app a cada coleção (ver "Versão do MapBiomas fixa na configuração", em Adiado).
 
 ### Declividade: Topodata SC
@@ -76,7 +76,7 @@ Registro das decisões da sessão de definição de 21/10/2026, atualizado em 10
 - **Legenda:** `legenda_declividade` (`data-raw/legenda_declividade.csv` → `data-raw/legenda_declividade.R`), com `class_id`, `descricao`, `lim_inf`, `lim_sup` (em %, intervalo [lim_inf, lim_sup)) e `color`. Nomes e limites do sistema Embrapa (0–3, 3–8, 8–20, 20–45, 45–75, >75%). A simbologia oficial do Topodata só tem rótulos "1" a "6" e tons de cinza, então as cores seguem uma rampa verde → vermelho escuro.
 - **Carga:** mesma estrutura de tabela do MapBiomas. Por causa da máscara, os tiles são gerados um a um, na mesma grade e numeração do `makeTiles`. O script de carga tem um modo teste (`modo_teste = TRUE`), que faz o caminho inteiro só com a folha de teste numa tabela `TESTE_` e confere a leitura com `contar_raster_bd()`.
 - **Teste de carga (11/11/2026, folha 22S435):** 28 tiles, 2,7 MB (~100 KB por tile), sem binário corrompido nem geometria com problema. A máscara retirou 1,19 milhão de pixels (~6% da folha), quase todos de Plano e Suave ondulado: só 42 pixels de Escarpado saíram, sinal de que cortou o mar e não as encostas. Numa área de teste de 2 km em torno de uma linha que cruza baixada, serra e costa, a contagem lida do banco por `contar_raster_bd()` foi idêntica à dos tiles locais nas 6 classes (893.126 pixels), desde que a referência local use a mesma geometria da função (`st_union()` + `st_make_valid()`): sem isso, 2 pixels com centro sobre a borda trocaram de lado.
-- **No app (12/11/2026):** aba "Declividade" em Meio Físico, com o `mod_raster_bd`. A tabela traz sempre as 6 classes, na ordem Plano → Escarpado, com 0 nas ausentes e a coluna `faixa` (ex.: "0 a 3%", "> 75%"), montada no `app_server.R` a partir de `lim_inf` e `lim_sup`. Falta testar no app em execução.
+- **No app (12/11/2026):** aba "Declividade" em Meio Físico, com o `resumir_raster_bd()`. A tabela traz sempre as 6 classes, na ordem Plano → Escarpado, com 0 nas ausentes e a coluna `faixa` (ex.: "0 a 3%", "> 75%"), montada no `app_server.R` a partir de `lim_inf` e `lim_sup`. Falta testar no app em execução.
 - **Carga completa (11/11/2026):** ~9.200 tiles, ~760 MB de GeoTIFF, todos com MD5 conferido, sem geometria com problema, com índice espacial. A gravação no banco levou 11 minutos.
 
 ### Geometrias inválidas para o s2: filtro de interseção com GEOS
@@ -89,7 +89,7 @@ Registro das decisões da sessão de definição de 21/10/2026, atualizado em 10
   - `st_make_valid()` com o s2 ligado (internamente, `s2::s2_rebuild()`): parte das geometrias continuou inválida para o s2.
   - Arredondar as coordenadas a 1e-7° (~1 cm, com `st_as_binary(precision = 1e7)`) e reparar com o GEOS (`sf_use_s2(FALSE)` + `st_make_valid()`): ainda restaram inválidos para o s2. O reparo no plano gera geometrias válidas pelas regras OGC que o s2 continua recusando.
   - `MakeValid()` no SQL Server não mudaria nada, porque o banco considera esses polígonos válidos.
-- **Decisão:** no `mod_banco`, a interseção com a área de estudo é feita com o GEOS. O `reactive` desliga o s2 só durante o `st_filter` e restaura o valor anterior com `on.exit()`. Os dados não são alterados. Para um predicado de interseção, o cálculo no plano, em graus, dá na prática o mesmo resultado que o esférico; só haveria diferença com arestas de centenas de quilômetros. Buffer e áreas continuam geodésicos, com o s2.
+- **Decisão:** no `mod_banco` (desde 13/11/2026, `consultar_tema_bd()`), a interseção com a área de estudo é feita com o GEOS. A função desliga o s2 só durante o `st_filter` e restaura o valor anterior com `on.exit()`. Os dados não são alterados. Para um predicado de interseção, o cálculo no plano, em graus, dá na prática o mesmo resultado que o esférico; só haveria diferença com arestas de centenas de quilômetros. Buffer e áreas continuam geodésicos, com o s2.
 
   ```r
   tema_corredor <- reactive({
@@ -100,7 +100,7 @@ Registro das decisões da sessão de definição de 21/10/2026, atualizado em 10
   })
   ```
 
-- **Fora do escopo:** o `mod_sobreposicao` não recebe o ajuste, porque será descontinuado com a migração de todos os temas para o BD. Pelo mesmo motivo, não foi criada uma função genérica de filtro (ex.: `filtrar_corredor()`) por ora.
+- **Fora do escopo:** o `mod_sobreposicao` (desde 13/11/2026, `ler_tema_arquivo()`) não recebe o ajuste, porque será descontinuado com a migração de todos os temas para o BD. Pelo mesmo motivo, não foi criada uma função genérica de filtro (ex.: `filtrar_corredor()`) por ora.
 - **Como diagnosticar outro tema:** trazer só o identificador e a geometria em WKB (`Shape.STAsBinary()`), com filtro espacial no servidor por um retângulo (`Shape.STIntersects(geometry::STGeomFromText('<wkt>', 4674)) = 1`). Converter com `st_as_sfc(structure(lapply(wkb, as.raw), class = "WKB"), crs = 4674)` e rodar `s2::s2_is_valid_detail()`. O `STIsValid()` do SQL Server não serve como teste, porque aceita essas geometrias.
 
 ### Envio da área de estudo: conferência do .zip (13/11/2026)
@@ -125,14 +125,26 @@ Registro das decisões da sessão de definição de 21/10/2026, atualizado em 10
 Ordem acordada:
 
 1. Testes automatizados e limpeza: feito em 13/11/2026. Saíram `query_bd()` (sem uso), o objeto `corredor` (documentação sem dado) e `data-raw/corredor.R`.
-2. Separar a consulta de cada tema (função pura, ex.: `analisar_tema(con, tema, area)`) da exibição (módulo), e implementar a situação do tema no registro e na aba "Resumo" da planilha de conferência. Hoje um tema que falha some da planilha, como se não existisse.
+2. Separar a consulta de cada tema da exibição e implementar a situação do tema: feito em 13/11/2026 (ver "Situação do tema e módulo genérico").
 3. Filtro espacial dos temas vetoriais pelo polígono da área de estudo, e não pelo bbox, com a geometria em WKB (`STAsBinary`) em vez de WKT.
 4. Funções de entrada e buffer (`ler_tracado()`, `gerar_area_estudo()`, `parse_distancia()`), sem ligar na UI.
 5. Catálogo de temas no `golem-config.yml` (chave, nome, grupo, tipo, colunas exibidas), substituindo a lista fixa do `app_server.R`. Fica no YAML por enquanto; a ida para o banco será avaliada com o catálogo de rasters (ver Adiado).
 
+### Situação do tema e módulo genérico (13/11/2026)
+
+- **Problema:** os módulos dos temas eram criados dentro de um `observeEvent` a cada envio da área de estudo, e cada um consultava o banco no momento da criação. Um tema que falhava só mostrava um aviso, e o `coletar_resultados()` o descartava: na planilha de conferência, ele ficava igual a um tema inexistente.
+- **Consulta separada da exibição:** cada tema é uma função pura que recebe a área de estudo e devolve a tabela de resultado: `consultar_tema_bd()` (vetorial do BD), `resumir_raster_bd()` (raster em tiles) e `ler_tema_arquivo()` (provisório, só a Hidrografia). Elas não dependem do Shiny e são testadas sem banco.
+- **Módulo único:** `mod_tema` substitui `mod_banco`, `mod_raster_bd` e `mod_sobreposicao`. Recebe a área de estudo, a função de consulta e o nome do tema. É criado uma vez no `app_server.R`, e a verificação refaz-se sempre que a área muda, mesmo com a aba fechada (como antes, tudo roda no envio).
+- **Situação do tema:** `verificar_tema()` roda a consulta e devolve um `resultado_tema`, com `situacao`, `dados` (tabela de resultado) e `erro`. Qualquer erro vira "não verificado"; tabela com linhas, "com interferência"; sem linhas, "sem interferência". Raster sem pixel com dado na área (fora do Brasil, mar aberto) fica "sem interferência".
+- **Na interface:** sem mudança visual. O tema não verificado mostra o motivo no lugar da tabela e um aviso na tela. Sem conexão ao banco, o aviso é único (o do início da sessão), e não um por tema.
+- **Planilha de conferência:** a aba "Resumo" traz todos os temas, com `Tema`, `Situação`, `Registros`, `Aba` e `Observação` (motivo da falha), com os não verificados no topo. Tema não verificado não tem aba própria.
+- **Ordem dos temas:** a ordem das chamadas no `app_server.R`, até o catálogo de temas (passo 5).
+
 - **`shinydashboard`:** continua no `DESCRIPTION` enquanto o app publicado usar essa interface. Sai na migração para `bslib`.
 
 ## Adiado (implementação futura)
+
+- **Autor no `DESCRIPTION`:** o e-mail ainda é o de exemplo (`seu.email@exemplo.com`). Definir qual e-mail entra (registrado em 13/11/2026).
 
 - **Aba de metadados:** temas consultados e, para cada um, a fonte em formato de referência bibliográfica, para o tópico equivalente da NT.
 - **Resumos por tema:** agregações (summarise) e agrupamentos descritivos. As regras serão definidas tema a tema.
@@ -143,7 +155,7 @@ Ordem acordada:
 - **Reatividade do protótipo:** o protótipo v2 simula estados prontos, sem reatividade real. O fluxo de dois botões descrito em "Decidido" ainda não está refletido nele.
 - **MapBiomas no servidor Shiny:** a leitura dos tiles foi validada na máquina de desenvolvimento. Falta o teste no servidor (permissão de leitura da conta de serviço na tabela e escrita na pasta temporária).
 - **Atualização anual do MapBiomas:** definir se a carga de cada nova coleção continua pelo script em R ou passa para o FME.
-- **Geometrias válidas na carga (registrado em 12/11/2026):** corrigir na origem os polígonos inválidos para o s2. O caminho a testar é arredondar as coordenadas (7 ou 8 casas decimais) antes da validação com reparo, mas o teste no R indica que o reparo no plano não basta para o s2. O critério de aceite da carga é a verificação com o s2 (zero inválidos, como em "Como diagnosticar outro tema"), não o `STIsValid()` do SQL Server. Enquanto isso, o filtro com GEOS no `mod_banco` mantém o app funcionando.
+- **Geometrias válidas na carga (registrado em 12/11/2026):** corrigir na origem os polígonos inválidos para o s2. O caminho a testar é arredondar as coordenadas (7 ou 8 casas decimais) antes da validação com reparo, mas o teste no R indica que o reparo no plano não basta para o s2. O critério de aceite da carga é a verificação com o s2 (zero inválidos, como em "Como diagnosticar outro tema"), não o `STIsValid()` do SQL Server. Enquanto isso, o filtro com GEOS no `consultar_tema_bd()` mantém o app funcionando.
 - **Versão do MapBiomas fixa na configuração (registrado em 11/11/2026):** a tabela de tiles e a coleção ficam no `golem-config.yml`. A configuração faz parte do pacote, então cada nova coleção ainda exige publicar o app de novo. A meta é que uma nova coleção entre só com a carga dos dados. Ideias a avaliar:
   - **Catálogo de rasters no BD:** uma tabela com tema, coleção, ano de referência, tabela de tiles, data da carga e se a versão está vigente. A carga registra a linha, e o app usa a versão vigente. As versões antigas continuam no banco, o que abre caminho para escolher a versão na interface e para análises comparativas.
   - **Legenda no BD, junto do catálogo:** hoje a legenda é um `.rda` dentro do pacote, então uma legenda nova também exige publicar o app. No banco, raster e legenda seriam atualizados juntos.

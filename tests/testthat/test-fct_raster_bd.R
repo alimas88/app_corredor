@@ -54,3 +54,47 @@ test_that("devolve tabela vazia quando não há tiles na área", {
   expect_equal(nrow(contagem), 0)
   expect_named(contagem, c("class_id", "n"))
 })
+
+legenda_teste <- dplyr::tibble(
+  class_id = c(3L, 15L, 21L, 33L),
+  descricao = c("Floresta", "Pastagem", "Mosaico", "Água"),
+  faixa = c("a", "b", "c", "d"),
+  color = c("#1f8d49", "#edde8e", "#ffefc3", "#2532e4")
+)
+
+test_that("percentual_classes() calcula o % sobre os pixels com dado", {
+  contagem <- dplyr::tibble(class_id = c(15L, 3L), n = c(1, 3))
+
+  r <- percentual_classes(contagem, legenda_teste)
+
+  expect_named(r, c("class_id", "percentagem", "descricao", "faixa", "color"))
+  expect_equal(r$class_id, c(3L, 15L))   # decrescente por percentagem
+  expect_equal(as.numeric(r$percentagem), c(75, 25))
+})
+
+test_that("percentual_classes() segue a ordem da legenda e inclui as classes ausentes", {
+  contagem <- dplyr::tibble(class_id = c(21L, 3L, 99L), n = c(1, 2, 1))
+
+  r <- percentual_classes(contagem, legenda_teste, ordem = "classe", todas_classes = TRUE)
+
+  expect_equal(r$class_id, c(3L, 15L, 21L, 33L, 99L))   # fora da legenda vai para o fim
+  expect_equal(as.numeric(r$percentagem), c(50, 0, 25, 0, 25))
+})
+
+test_that("percentual_classes() não tem linhas quando a área não tem pixel com dado", {
+  vazio <- dplyr::tibble(class_id = integer(0), n = numeric(0))
+
+  r <- percentual_classes(vazio, legenda_teste, todas_classes = TRUE)
+
+  expect_equal(nrow(r), 0)
+  expect_named(r, c("class_id", "percentagem", "descricao", "faixa", "color"))
+  expect_equal(resultado_tema(r)$situacao, "sem interferência")
+})
+
+test_that("validar_legenda() recusa legenda vazia, incompleta ou com classe repetida", {
+  expect_invisible(validar_legenda(legenda_teste, "Teste"))
+  expect_error(validar_legenda(legenda_teste[0, ], "Teste"), "vazia")
+  expect_error(validar_legenda(dplyr::select(legenda_teste, -color), "Teste"), "color")
+  expect_error(validar_legenda(dplyr::bind_rows(legenda_teste, legenda_teste), "Teste"),
+               "repetido")
+})

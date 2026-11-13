@@ -1,20 +1,24 @@
 #' Avalia os reactives do registro
 #'
-#' @description Executa cada reactive registrado. Os que falharem (por exemplo,
-#' `req()` sem corredor) são ignorados. Geometrias são removidas. Os reactives
-#' são avaliados com `isolate()`, então a função também roda fora de um
-#' contexto reativo (ex.: nos testes).
+#' @description Executa cada reactive registrado e devolve o resultado de cada
+#' tema. Os que param no `req()` (ainda sem área de estudo) são ignorados.
+#' Qualquer outro erro vira "não verificado", para que o tema não suma da
+#' planilha de conferência. Os reactives são avaliados com `isolate()`, então a
+#' função também roda fora de um contexto reativo (ex.: nos testes).
 #'
 #' @param registro reactiveVal criado por `registro_criar()`.
 #'
-#' @return lista nomeada de tibbles
+#' @return lista nomeada (pelo tema) de `resultado_tema`.
 #' @noRd
 coletar_resultados <- function(registro) {
 
-  shiny::isolate(registro()) %>%
-    purrr::map(~ tryCatch(shiny::isolate(.x()), error = function(e) NULL)) %>%
-    purrr::compact() %>%
-    purrr::map(preparar_aba)
+  shiny::isolate(registro()) |>
+    purrr::map(\(r) tryCatch(
+      shiny::isolate(r()),
+      shiny.silent.error = function(e) NULL,
+      error = function(e) resultado_tema(erro = e)
+    )) |>
+    purrr::compact()
 }
 
 #' Prepara um resultado para exportação em xlsx
@@ -28,9 +32,9 @@ coletar_resultados <- function(registro) {
 #' @noRd
 preparar_aba <- function(dados) {
 
-  dados %>%
-    sf::st_drop_geometry() %>%
-    dplyr::as_tibble() %>%
+  dados |>
+    sf::st_drop_geometry() |>
+    dplyr::as_tibble() |>
     dplyr::mutate(dplyr::across(
       dplyr::where(is.list),
       ~ purrr::map_chr(.x, ~ paste(format(.x), collapse = "; "))
@@ -57,24 +61,41 @@ nomes_abas_validos <- function(nomes) {
   make.unique(nomes, sep = "_")
 }
 
-#' Escreve o xlsx final
+#' Escreve a planilha de conferência
 #'
-#' @description Um único arquivo com a aba "Resumo" e uma aba por resultado.
+#' @description Um único arquivo com a aba "Resumo" e uma aba por tema
+#' verificado. O "Resumo" traz a situação de todos os temas, com os não
+#' verificados no topo e o motivo da falha. Tema não verificado não tem aba.
 #'
-#' @param resultados lista nomeada de data.frames (saída de `coletar_resultados()`).
+#' @param resultados lista nomeada de `resultado_tema` (saída de
+#'   `coletar_resultados()`).
 #' @param path caminho do arquivo .xlsx.
 #'
 #' @return path (invisível)
 #' @noRd
 escrever_xlsx <- function(resultados, path) {
 
-  nomes <- nomes_abas_validos(names(resultados))
-  resultados <- stats::setNames(resultados, nomes)
+  situacao <- purrr::map_chr(resultados, "situacao")
+  verificado <- situacao != SITUACAO[["nao_verificado"]]
+
+  # "Resumo" entra na lista só para não haver aba de tema com o mesmo nome
+  nomes_abas <- nomes_abas_validos(c("Resumo", rlang::names2(resultados)[verificado]))[-1]
+
+  abas <- resultados[verificado] |>
+    purrr::map(\(r) preparar_aba(r$dados)) |>
+    stats::setNames(nomes_abas)
+
+  aba <- rep(NA_character_, length(resultados))
+  aba[verificado] <- nomes_abas
 
   resumo <- dplyr::tibble(
-    Aba = nomes,
-    Registros = purrr::map_int(resultados, nrow)
-  )
+    Tema = rlang::names2(resultados),
+    `Situação` = unname(situacao),
+    Registros = purrr::map_int(resultados, \(r) if (is.null(r$dados)) NA_integer_ else nrow(r$dados)),
+    Aba = aba,
+    `Observação` = purrr::map_chr(resultados, \(r) if (is.null(r$erro)) NA_character_ else r$erro)
+  ) |>
+    dplyr::arrange(`Situação` != SITUACAO[["nao_verificado"]])
 
-  writexl::write_xlsx(c(list(Resumo = resumo), resultados), path = path)
+  writexl::write_xlsx(c(list(Resumo = resumo), abas), path = path)
 }
