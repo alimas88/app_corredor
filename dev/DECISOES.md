@@ -1,6 +1,6 @@
 # analise.corredor: decisões e pendências
 
-Registro das decisões da sessão de definição de 21/10/2026, atualizado em 10, 11, 12 e 13/11/2026 com as decisões sobre rasters, legendas do MapBiomas, declividade, geometrias inválidas para o s2, validação do envio da área de estudo, testes automatizados, ordem dos próximos passos e filtro espacial pelo polígono. O vocabulário está em `dev/CONTEXT.md`.
+Registro das decisões da sessão de definição de 21/10/2026, atualizado em 10, 11, 12 e 13/11/2026 com as decisões sobre rasters, legendas do MapBiomas, declividade, geometrias inválidas para o s2, validação do envio da área de estudo, testes automatizados, ordem dos próximos passos, filtro espacial pelo polígono e leitura do traçado com buffer geodésico. O vocabulário está em `dev/CONTEXT.md`.
 
 ## Decidido
 
@@ -16,10 +16,10 @@ Registro das decisões da sessão de definição de 21/10/2026, atualizado em 10
 - **Declividade:** % da área de estudo por classe, no mesmo formato do MapBiomas. Fonte: Topodata SC (INPE, ~30 m, 6 classes Embrapa) (decisão de 11/11/2026). Detalhes na seção "Declividade: Topodata SC".
 - **Dados vetoriais:** a meta é ler tudo do SQL Server. Os temas ainda lidos de arquivo ganham views no banco.
 - **Colunas exibidas:** lista de colunas por tema no catálogo, usada na síntese e na interface. É configuração, não regra de resumo. Sem lista, entram todas as colunas menos as técnicas. A planilha de conferência traz todas.
-- **Sistema de referência:** buffer e áreas calculados de forma geodésica em SIRGAS 2000 geográfico (4674), com `sf` + `s2`. Não depende de fuso. Os valores podem diferir um pouco dos do ArcGIS/QGIS. Exceção: o filtro de interseção dos temas vetoriais do BD usa GEOS (decisão de 12/11/2026, ver "Geometrias inválidas para o s2").
+- **Sistema de referência:** buffer e áreas calculados de forma geodésica em SIRGAS 2000 geográfico (4674). Não depende de fuso. As áreas são calculadas com `sf` + `s2`, na esfera, e podem diferir um pouco das do ArcGIS/QGIS. O buffer é calculado no elipsoide GRS80, por trechos em projeção azimutal equidistante, porque o buffer do s2 é impreciso (decisão de 14/11/2026, ver "Buffer geodésico"). Exceção: o filtro de interseção dos temas vetoriais do BD usa GEOS (decisão de 12/11/2026, ver "Geometrias inválidas para o s2").
 - **Distância de buffer na interface:** em km, com decimais (ex.: 0,04 km = 40 m, faixa de servidão). Campo vazio por padrão, aceita qualquer valor positivo e não tem limite máximo. O app também serve a outros usos, como a faixa de servidão.
 - **Framework de UI:** a reestruturação é feita em `bslib` (decisão de 21/10/2026, substitui a preferência anterior por `bs4Dash`).
-- **Entrada:** `.zip` (shapefile), `.kml/.kmz`, `.gpkg` e `.zip` com `.gdb`. Com várias camadas, o usuário escolhe uma. O tipo de geometria detectado define se a distância é obrigatória (ponto e linha) ou fica desabilitada (polígono).
+- **Entrada:** `.zip` (shapefile), `.kml/.kmz`, `.gpkg` e `.zip` com `.gdb`. Com várias camadas, o usuário escolhe uma. O tipo de geometria detectado define se a distância é obrigatória (ponto e linha) ou fica desabilitada (polígono). A camada deve ter uma única feição: mais de uma é recusada, inclusive uma LT em vários segmentos, para que o analista tenha plena consciência do que entra no app (decisão de 14/11/2026).
 - **Mapa:** módulo próprio (`mod_mapa`), separado do módulo do traçado. Mostra o traçado, a área de estudo e as interferências por tema em camadas que se ligam e desligam, com popups e legenda. O mapa estático na síntese fica para depois.
 - **Telas:** navegação por barra superior (`page_navbar`), com barra lateral só na página Análise. Validado no protótipo v2 (`dev/prototipos/prototipo_sintese.html`).
   - **Análise:** barra lateral com envio do arquivo, escolha de camada, geometria detectada, distância e botões; mapa ao lado.
@@ -106,7 +106,7 @@ Registro das decisões da sessão de definição de 21/10/2026, atualizado em 10
 ### Envio da área de estudo: conferência do .zip (13/11/2026)
 
 - **Problema:** o `mod_corredor` tentava ler qualquer `.zip` e derrubava a sessão quando não havia shapefile dentro. Depois de um envio inválido, a mensagem de erro continuava na tela mesmo após um envio válido.
-- **Leitura:** `ler_corredor()` (`R/fct_corredor.R`) confere o `.zip` antes de ler, com uma mensagem por problema: arquivo que não é `.zip` ou está corrompido; nenhum `.shp` ou mais de um; falta de `.dbf`, `.shx` ou `.prj` (sem `.prj`, a reprojeção quebrava); shapefile ilegível ou sem feições; `.prj` não reconhecido; geometria que não é polígono; mais de uma feição; feição sem geometria. O shapefile pode estar numa pasta dentro do `.zip`, e os arquivos de controle do macOS (`__MACOSX/`, `._*`) são ignorados. Os erros previstos têm a classe `erro_corredor`; qualquer outro erro vira uma mensagem genérica, sem derrubar a sessão.
+- **Leitura:** `ler_corredor()` (desde 14/11/2026, em `R/fct_tracado.R`, chamando `ler_tracado()`) confere o `.zip` antes de ler, com uma mensagem por problema: arquivo que não é `.zip` ou está corrompido; nenhum `.shp` ou mais de um; falta de `.dbf`, `.shx` ou `.prj` (sem `.prj`, a reprojeção quebrava); shapefile ilegível ou sem feições; `.prj` não reconhecido; geometria que não é polígono; mais de uma feição; feição sem geometria. O shapefile pode estar numa pasta dentro do `.zip`, e os arquivos de controle do macOS (`__MACOSX/`, `._*`) são ignorados. Os erros previstos têm a classe `erro_entrada` (até 13/11/2026, `erro_corredor`); qualquer outro erro vira uma mensagem genérica, sem derrubar a sessão.
 - **Mensagem:** numa caixa própria acima do mapa, substituída a cada envio e apagada quando o envio dá certo. O mapa nunca recebe erro: mostra o Brasil sem corredor e o polígono com corredor. A causa da mensagem persistente não foi reproduzida; a hipótese é que o erro ia para o próprio `leafletOutput`, que não o limpava ao renderizar de novo.
 - **Envio inválido descarta o corredor anterior:** o mapa volta ao Brasil, e as tabelas dos temas ficam vazias (param no `req()`) e saem da planilha exportada até o próximo envio válido. Motivo: não manter na tela resultados de um arquivo que não é o último enviado. Para manter o anterior, trocar `corredor(lido$sf)` por `if (!is.null(lido$sf)) corredor(lido$sf)` no `mod_corredor.R`.
 - **Provisório:** vale até a reestruturação da entrada (`.kml/.kmz`, `.gpkg`, `.gdb` e traçado com buffer, ver "Entrada" e "Fluxo do buffer"). A conferência do shapefile deve ser reaproveitada lá.
@@ -127,7 +127,7 @@ Ordem acordada:
 1. Testes automatizados e limpeza: feito em 13/11/2026. Saíram `query_bd()` (sem uso), o objeto `corredor` (documentação sem dado) e `data-raw/corredor.R`.
 2. Separar a consulta de cada tema da exibição e implementar a situação do tema: feito em 13/11/2026 (ver "Situação do tema e módulo genérico").
 3. Filtro espacial dos temas vetoriais pelo polígono da área de estudo, com a geometria em WKB: feito em 13/11/2026 (ver "Filtro espacial pelo polígono"). Falta medir o ganho com o banco.
-4. Funções de entrada e buffer (`ler_tracado()`, `gerar_area_estudo()`, `parse_distancia()`), sem ligar na UI. Em aberto: o que fazer com um traçado de LT em vários segmentos (várias feições de linha).
+4. Funções de entrada e buffer, sem ligar na UI: feito em 14/11/2026 (ver "Leitura do traçado" e "Buffer geodésico").
 5. Catálogo de temas no `golem-config.yml` (chave, nome, grupo, tipo, colunas exibidas), substituindo a lista fixa do `app_server.R`. Fica no YAML por enquanto; a ida para o banco será avaliada com o catálogo de rasters (ver Adiado).
 
 ### Situação do tema e módulo genérico (13/11/2026)
@@ -151,6 +151,37 @@ Ordem acordada:
 - **Precisão do polígono:** o `st_as_text()` arredonda por padrão para 7 algarismos significativos (~1 m em graus). O `sql_geometria()` usa 15, e o `contar_raster_bd()` passou a usar a mesma função.
 - **Tamanho da consulta:** num bipolo fictício de 2.586 km, a área de estudo tem de 1.200 a 2.900 vértices (buffer de 10 km a 40 m), e o texto da consulta fica entre 45 e 105 KB, longe do limite do SQL Server. Uma área de estudo enviada pronta, muito detalhada, pode ser maior; se a consulta ficar lenta, simplificar o polígono antes (sem encolhê-lo).
 - **Falta:** medir o tempo antes e depois num corredor real, com Processos Minerários e Rodovias, e conferir que o número de interferências não muda. Script pronto, só de leitura: `dev/medir_filtro_poligono.R`.
+
+### Leitura do traçado (14/11/2026)
+
+- **Funções** (`R/fct_tracado.R`), ainda sem uso na interface:
+  - `listar_camadas(caminho, nome)`: camadas do arquivo, com tipo de geometria e número de feições, para a escolha da camada.
+  - `ler_tracado(caminho, nome, camada)`: devolve uma feição em 4674, sem Z/M (o KML traz altitude).
+  - `tipo_geometria()`: "ponto", "linha" ou "poligono". Define se a distância de buffer é obrigatória ou fica desabilitada.
+- **Formatos:** `.zip` com shapefile (com `.dbf`, `.shx` e `.prj`) ou com `.gdb`, na raiz ou numa pasta; `.kml`; `.kmz`; `.gpkg`. A conferência do shapefile de 13/11/2026 foi reaproveitada. Um `.zip` com mais de um conjunto de dados (dois shapefiles, ou shapefile e `.gdb`) é recusado.
+- **Recusas, todas com mensagem (`erro_entrada`):** formato não aceito; arquivo corrompido; várias camadas sem a escolha de uma; camada inexistente, sem geometria, sem feições ou sem sistema de coordenadas; mais de uma feição; feição vazia; geometria que não é ponto, linha ou polígono.
+- **KML:** o formato não informa o tipo de geometria das camadas, então `listar_camadas()` não descarta nenhuma, e uma camada sem geometria só é recusada na leitura.
+- **`ler_corredor()`:** continua para a interface atual (só `.zip` com polígono), agora como uma chamada de `ler_tracado()`.
+
+### Buffer geodésico (14/11/2026)
+
+- **Problema:** o `st_buffer()` do `sf` em coordenadas geográficas usa o s2, que aproxima o buffer por células (`s2_buffer_cells`). Num traçado fictício de 2.586 km, com os parâmetros padrão (`max_cells = 1000`):
+
+  | Buffer | Área esperada | Área do s2 | Distância máxima da borda ao eixo |
+  |---|---|---|---|
+  | 40 m | 207 km² | 9.541 km² | 5.240 m |
+  | 2,5 km | 12.950 km² | 25.972 km² | 11.959 m |
+
+  Com `max_cells = 1e5`, o de 40 m ainda deu 373 km², borda a até 143 m e 157 mil vértices. O app ainda não fazia buffer, então nenhum resultado publicado foi afetado. O corredor fictício dos testes, gerado com o s2, foi substituído.
+- **Solução (`buffer_geodesico()`, `R/fct_area_estudo.R`):** cada ponto, e cada trecho de linha de até 50 km, é projetado numa azimutal equidistante (elipsoide GRS80, o do SIRGAS 2000) centrada nele, recebe o buffer em metros e volta a 4674. As partes são unidas num só polígono. A linha é densificada pelo caminho geodésico a cada 1 km antes da divisão: com vértices a cada 5 km, o buffer de 40 m ficava até 6 mm mais estreito.
+- **Simplificação:** cada parte recebe o buffer com uma folga de 0,05% da distância e é simplificada com essa tolerância, em metros. A borda fica entre a distância pedida e 0,1% a mais (40 m: até 4 cm; 2,5 km: até 2,5 m), nunca menos. Sem isso, um traçado com 20 mil vértices gerava uma área de estudo com 640 mil vértices, que vai no texto de cada consulta ao banco.
+- **Validação:** distância de vértices da borda ao eixo medida no elipsoide, com uma azimutal equidistante centrada em cada vértice, que dá a distância exata a partir do centro. Nos testes automatizados (40 m, 2,5 km, 10 km em ponto, bipolo de ~1.400 km), a borda fica sempre no intervalo acima.
+- **Desempenho:** LT fictícia de 2.642 km com 6.116 vértices: ~2,3 s; área de estudo com 6.400 a 8.400 vértices; consulta ao banco de ~230 a 300 KB. A área do buffer de 40 m deu 211,8 km², para 211,4 km² esperados (2 × 0,04 km × 2.642 km).
+- **Funções:**
+  - `gerar_area_estudo(tracado, distancia_km)`: buffer para ponto e linha (distância obrigatória, maior que zero); polígono é usado como veio e não aceita distância. Devolve a área de estudo com a coluna `distancia_km` (NA para área enviada pronta).
+  - `area_km2()`: área com o s2, para mostrar na interface.
+  - `parse_distancia()`: texto em km no formato brasileiro (vírgula decimal, ponto de milhar quando há vírgula; sem vírgula, o ponto é decimal; aceita "km" no fim).
+  - `conferir_distancia()`: NULL ou a mensagem para o `validate()` do campo de distância.
 
 - **`shinydashboard`:** continua no `DESCRIPTION` enquanto o app publicado usar essa interface. Sai na migração para `bslib`.
 

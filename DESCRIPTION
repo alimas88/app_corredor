@@ -16,11 +16,13 @@ Imports:
     odbc,
     purrr,
     rlang,
+    s2,
     sf,
     shiny,
     shinydashboard,
     stringr,
     terra,
+    tools,
     utils,
     writexl
 Suggests:
