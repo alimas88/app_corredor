@@ -85,3 +85,26 @@ arquivo_camadas <- function(camadas, formato, env = parent.frame()) {
     }
   )
 }
+
+#' Raster de classes em WGS 84 (como o MapBiomas), cortado em tiles GeoTIFF
+#' (INT1U, uma linha por tile, como na carga)
+tiles_teste <- function(area, n_tiles = 2) {
+  ext <- terra::ext(sf::st_bbox(sf::st_transform(area, 4326))) + 0.05
+  r <- terra::rast(ext, resolution = 0.01, crs = "EPSG:4326")
+  terra::values(r) <- rep_len(c(3L, 15L, 21L, NA), terra::ncell(r))
+
+  pasta <- withr::local_tempdir(.local_envir = parent.frame())
+  arquivos <- terra::makeTiles(r, c(ceiling(terra::nrow(r) / n_tiles), terra::ncol(r)),
+                               filename = file.path(pasta, "tile_.tif"),
+                               datatype = "INT1U", NAflag = 0)
+  list(
+    raster = r,
+    tabela = data.frame(
+      tile_id = seq_along(arquivos),
+      # extensão do tile, como a coluna Shape da carga (em 4674)
+      wkt = vapply(arquivos, \(f) sf::st_as_text(sf::st_as_sfc(sf::st_bbox(terra::rast(f)))),
+                   character(1), USE.NAMES = FALSE),
+      tif = I(lapply(arquivos, \(f) readBin(f, "raw", file.size(f))))
+    )
+  )
+}

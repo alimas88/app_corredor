@@ -26,6 +26,7 @@ Imports:
     utils,
     writexl
 Suggests:
+    blob,
     readxl,
     testthat (>= 3.0.0),
     withr

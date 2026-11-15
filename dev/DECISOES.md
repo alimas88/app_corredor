@@ -1,6 +1,6 @@
 # analise.corredor: decisões e pendências
 
-Registro das decisões da sessão de definição de 21/10/2026, atualizado em 10, 11, 12 e 13/11/2026 com as decisões sobre rasters, legendas do MapBiomas, declividade, geometrias inválidas para o s2, validação do envio da área de estudo, testes automatizados, ordem dos próximos passos, filtro espacial pelo polígono e leitura do traçado com buffer geodésico. O vocabulário está em `dev/CONTEXT.md`.
+Registro das decisões da sessão de definição de 21/10/2026, atualizado em 10, 11, 12 e 13/11/2026 com as decisões sobre rasters, legendas do MapBiomas, declividade, geometrias inválidas para o s2, validação do envio da área de estudo, testes automatizados, ordem dos próximos passos, filtro espacial pelo polígono, leitura do traçado com buffer geodésico e banco de teste local. O vocabulário está em `dev/CONTEXT.md`.
 
 ## Decidido
 
@@ -119,6 +119,16 @@ Registro das decisões da sessão de definição de 21/10/2026, atualizado em 10
 - **`contar_raster_bd()` sem banco:** o `DBI::dbGetQuery()` é simulado com `local_mocked_bindings()` e devolve tiles GeoTIFF gerados no teste. A contagem é comparada com a do raster inteiro, como na validação de 11/11/2026.
 - **Área de estudo de teste:** gerada em `tests/testthat/helper-area_estudo.R` (buffer de 2,5 km de uma linha inventada no Brasil Central). Substitui o objeto `corredor`, que estava documentado mas não existia em `data/`.
 - **`coletar_resultados()`:** passou a avaliar cada resultado com `isolate()`, para rodar também fora de um contexto reativo.
+- **Testes de integração (15/11/2026):** `tests/testthat/test-integracao_bd.R` roda as consultas reais num SQL Server local (ver "Banco de teste local"). Sem as variáveis `ANALISE_BD_TESTE_*`, eles são pulados, e o `devtools::test()` continua rodando sem banco.
+
+### Banco de teste local (15/11/2026)
+
+- **Motivo:** os passos 2 e 3 mudaram as consultas ao banco, e elas só tinham sido testadas com o `DBI` simulado. Um PostgreSQL não serviria, porque a sintaxe espacial é outra (`ST_Intersects` em vez de `Shape.STIntersects`).
+- **O que é:** SQL Server 2022 (edição Developer, gratuita para desenvolvimento e teste) em Docker, com a imagem oficial `mcr.microsoft.com/mssql/server:2022-latest`. A versão de produção deve ser a 2022 (a confirmar). O pacote para Ubuntu 24.04 só existe na versão 2025, por isso o Docker. Licença da Microsoft aceita em 15/11/2026.
+- **Como subir:** `bash dev/bd_teste.sh`. Inicia o Docker se preciso, cria ou reinicia o container, cria o banco `analise_teste` e grava a conexão em `~/.Renviron` (fora do repositório): `ANALISE_BD_TESTE_DRIVER`, `_SERVER`, `_DATABASE`, `_UID` e `_SENHA`. A senha é local, gerada na primeira execução e guardada em `~/.analise_bd_teste`. Exige o driver ODBC 18 (`msodbcsql18`).
+- **Segurança:** o banco só escuta em `127.0.0.1`. Os testes de integração se recusam a rodar se `ANALISE_BD_TESTE_SERVER` não for local, para que nunca rodem contra o banco de produção. As tabelas usam o prefixo `TESTE_` e são apagadas ao fim de cada teste.
+- **O que os testes conferem no SQL Server real:** `consultar_tema_bd()` com o filtro pelo polígono (uma feição dentro do retângulo envolvente e fora do corredor não vem), o WKB, a ordem das colunas `(max)` exigida pelo driver ODBC, esquema (`dbo.`) e view, o filtro de linhas, tabela inexistente ("não verificado") e `contar_raster_bd()` e `resumir_raster_bd()` com tiles GeoTIFF gravados no banco, conferidos contra o raster original.
+- **Não substitui o banco de produção:** os dados são sintéticos. Desempenho, geometrias reais inválidas para o s2, permissões e a medição do passo 3 continuam dependendo do banco de produção.
 
 ### Próximos passos sem alteração da UI (definidos em 13/11/2026)
 
