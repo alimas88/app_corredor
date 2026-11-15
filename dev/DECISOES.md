@@ -1,6 +1,6 @@
 # analise.corredor: decisões e pendências
 
-Registro das decisões da sessão de definição de 21/10/2026, atualizado em 10, 11, 12 e 13/11/2026 com as decisões sobre rasters, legendas do MapBiomas, declividade, geometrias inválidas para o s2, validação do envio da área de estudo, testes automatizados, ordem dos próximos passos, filtro espacial pelo polígono, leitura do traçado com buffer geodésico e banco de teste local. O vocabulário está em `dev/CONTEXT.md`.
+Registro das decisões da sessão de definição de 21/10/2026, atualizado em 10, 11, 12 e 13/11/2026 com as decisões sobre rasters, legendas do MapBiomas, declividade, geometrias inválidas para o s2, validação do envio da área de estudo, testes automatizados, ordem dos próximos passos, filtro espacial pelo polígono, leitura do traçado com buffer geodésico, banco de teste local e catálogo de temas. O vocabulário está em `dev/CONTEXT.md`.
 
 ## Decidido
 
@@ -43,7 +43,7 @@ Registro das decisões da sessão de definição de 21/10/2026, atualizado em 10
 - **Carga:** `data-raw/carga_mapbiomas_col11_2025.R`. Resultado da carga da Coleção 11 (2025): ~9.700 tiles, ~660 MB de GeoTIFF, todos com MD5 conferido. O raster equivalente em geodatabase, sem compressão, ocupa cerca de 20 GB.
 - **Leitura:** `contar_raster_bd()` (`R/fct_raster_bd.R`) busca os tiles que intersectam o polígono da área de estudo, monta um mosaico virtual (VRT) e conta os pixels por classe com `crop(mask = TRUE, touches = FALSE)` + `freq()`. Validada em 11/11/2026 contra o `.tif` original em quatro áreas (corredores, litoral e canto entre tiles), com contagens idênticas.
 - **Contagem no `terra`, não `extract`:** num corredor de 10,5 milhões de pixels, o `extract` + `count` levou 28,6 s no `.tif` local, contra 7,7 s do `crop` + `mask` + `freq`. A regra `touches = FALSE` (pixel entra se o centro está na área) é a mesma do `extract`; com `touches = TRUE`, o padrão do `mask`, entram ~0,2% a mais de pixels, os da borda. As duas formas diferiram em 1 pixel em 10,5 milhões, um empate de centro sobre a borda.
-- **Função:** `resumir_raster_bd()` (`R/fct_raster_bd.R`), genérica para qualquer raster de classes em tiles no BD, exibida pelo `mod_tema` (decisão de 12/11/2026, revista em 13/11/2026: o `mod_raster_bd` virou função pura, ver "Situação do tema e módulo genérico"). Recebe `tabela`, `legenda` (`class_id`, `descricao`, `color` e colunas extras a exibir), `tema` (nome usado nas mensagens), `ordem` ("percentagem" decrescente ou "classe", a ordem da legenda) e `todas_classes` (inclui com 0 as classes ausentes na área). A legenda é preparada no `app_server.R` e conferida por `validar_legenda()`.
+- **Função:** `resumir_raster_bd()` (`R/fct_raster_bd.R`), genérica para qualquer raster de classes em tiles no BD, exibida pelo `mod_tema` (decisão de 12/11/2026, revista em 13/11/2026: o `mod_raster_bd` virou função pura, ver "Situação do tema e módulo genérico"). Recebe `tabela`, `legenda` (`class_id`, `descricao`, `color` e colunas extras a exibir), `tema` (nome usado nas mensagens), `ordem` ("percentagem" decrescente ou "classe", a ordem da legenda) e `todas_classes` (inclui com 0 as classes ausentes na área). A legenda é preparada por `legenda_raster()` (`R/fct_catalogo.R`), a partir do campo `legenda` do tema no catálogo, e conferida por `validar_legenda()`.
 - **Outros softwares:** ArcGIS e QGIS enxergam a tabela só como polígonos (o contorno dos tiles). Ela é feita para o app.
 - **FME:** os writers de SQL Server do FME não gravam raster. Se a atualização passar para o FME, o caminho é `RasterTiler` + `RasterExtractor` (GeoTIFF) + writer MSSQL, mantendo a mesma estrutura de tabela.
 
@@ -52,7 +52,7 @@ Registro das decisões da sessão de definição de 21/10/2026, atualizado em 10
 - **Estrutura:** `legenda_mapbiomas` empilha as legendas de todas as coleções, com as colunas `colecao`, `class_id`, `level`, `descricao` e `color` (decisão de 10/11/2026, revista em 11/11/2026: saiu `descricao_en`, que nenhuma das legendas guardadas tem). Cada coleção mantém a estrutura da Coleção 10. As coleções antigas não são apagadas, para permitir análises comparativas entre versões.
 - **Fontes:** os CSVs ficam em `data-raw/legendas_mapbiomas/`, um por coleção (`colecao_<n>.csv`), todos no mesmo formato (`class_id`, `level`, `descricao`, `color`, UTF-8), e são permanentes. A Coleção 10 foi exportada do `.rda` anterior. A Coleção 11 foi montada a partir do PDF oficial (de 13/08/2026), porque o CSV oficial só tem as 33 classes finais, sem nível, e tem erros de grafia. `data-raw/atualizacao_legenda.R` lê todos os `colecao_<n>.csv` da pasta, sem download, confere e gera o `.rda`.
 - **Coleção 11 (montada em 11/11/2026):** 41 classes (33 finais e 8 agregadoras), com `level` de 1 a 4, nomes e cores do PDF, na ordem hierárquica dele. Na classe 22, mantida a grafia da Coleção 10, "Área não Vegetada" (o PDF usa "não vegetada"). Em relação à Coleção 10: 5 classes novas (7, 77, 84, 75, 91), 1 removida (27, "Não observado"), 1 renomeada (50, "Restinga Herbácea ou Arbustiva") e cores diferentes nas classes 1, 6, 10, 14, 26, 29 e 50 (29 e 50 trocaram de cor entre si).
-- **Uso no app:** o `app_server.R` filtra a `legenda_mapbiomas` pela coleção configurada (`mapbiomas_colecao` no `golem-config.yml`) e passa o resultado ao `resumir_raster_bd()`. Uma legenda vazia (coleção sem legenda) impede a análise, com mensagem.
+- **Uso no app:** `legenda_raster()` filtra a `legenda_mapbiomas` pela coleção do tema no catálogo (campo `colecao` do tema `mapbiomas` no `golem-config.yml`; até 14/11/2026, `mapbiomas_colecao`) e o resultado vai ao `resumir_raster_bd()`. Uma legenda vazia (coleção sem legenda) impede a análise, com mensagem.
 - **Nova coleção (provisório):** montar o `colecao_<n>.csv` no formato padrão a partir da legenda oficial, salvar na pasta, rodar o script e trocar a tabela e a coleção no `golem-config.yml`. Esse fluxo ainda exige publicar o app a cada coleção (ver "Versão do MapBiomas fixa na configuração", em Adiado).
 
 ### Declividade: Topodata SC
@@ -76,7 +76,7 @@ Registro das decisões da sessão de definição de 21/10/2026, atualizado em 10
 - **Legenda:** `legenda_declividade` (`data-raw/legenda_declividade.csv` → `data-raw/legenda_declividade.R`), com `class_id`, `descricao`, `lim_inf`, `lim_sup` (em %, intervalo [lim_inf, lim_sup)) e `color`. Nomes e limites do sistema Embrapa (0–3, 3–8, 8–20, 20–45, 45–75, >75%). A simbologia oficial do Topodata só tem rótulos "1" a "6" e tons de cinza, então as cores seguem uma rampa verde → vermelho escuro.
 - **Carga:** mesma estrutura de tabela do MapBiomas. Por causa da máscara, os tiles são gerados um a um, na mesma grade e numeração do `makeTiles`. O script de carga tem um modo teste (`modo_teste = TRUE`), que faz o caminho inteiro só com a folha de teste numa tabela `TESTE_` e confere a leitura com `contar_raster_bd()`.
 - **Teste de carga (11/11/2026, folha 22S435):** 28 tiles, 2,7 MB (~100 KB por tile), sem binário corrompido nem geometria com problema. A máscara retirou 1,19 milhão de pixels (~6% da folha), quase todos de Plano e Suave ondulado: só 42 pixels de Escarpado saíram, sinal de que cortou o mar e não as encostas. Numa área de teste de 2 km em torno de uma linha que cruza baixada, serra e costa, a contagem lida do banco por `contar_raster_bd()` foi idêntica à dos tiles locais nas 6 classes (893.126 pixels), desde que a referência local use a mesma geometria da função (`st_union()` + `st_make_valid()`): sem isso, 2 pixels com centro sobre a borda trocaram de lado.
-- **No app (12/11/2026):** aba "Declividade" em Meio Físico, com o `resumir_raster_bd()`. A tabela traz sempre as 6 classes, na ordem Plano → Escarpado, com 0 nas ausentes e a coluna `faixa` (ex.: "0 a 3%", "> 75%"), montada no `app_server.R` a partir de `lim_inf` e `lim_sup`. Falta testar no app em execução.
+- **No app (12/11/2026):** aba "Declividade" em Meio Físico, com o `resumir_raster_bd()`. A tabela traz sempre as 6 classes, na ordem Plano → Escarpado, com 0 nas ausentes e a coluna `faixa` (ex.: "0 a 3%", "> 75%"), montada por `legenda_raster()` a partir de `lim_inf` e `lim_sup`. Falta testar no app em execução.
 - **Carga completa (11/11/2026):** ~9.200 tiles, ~760 MB de GeoTIFF, todos com MD5 conferido, sem geometria com problema, com índice espacial. A gravação no banco levou 11 minutos.
 
 ### Geometrias inválidas para o s2: filtro de interseção com GEOS
@@ -138,7 +138,7 @@ Ordem acordada:
 2. Separar a consulta de cada tema da exibição e implementar a situação do tema: feito em 13/11/2026 (ver "Situação do tema e módulo genérico").
 3. Filtro espacial dos temas vetoriais pelo polígono da área de estudo, com a geometria em WKB: feito em 13/11/2026 (ver "Filtro espacial pelo polígono"). Falta medir o ganho com o banco.
 4. Funções de entrada e buffer, sem ligar na UI: feito em 14/11/2026 (ver "Leitura do traçado" e "Buffer geodésico").
-5. Catálogo de temas no `golem-config.yml` (chave, nome, grupo, tipo, colunas exibidas), substituindo a lista fixa do `app_server.R`. Fica no YAML por enquanto; a ida para o banco será avaliada com o catálogo de rasters (ver Adiado).
+5. Catálogo de temas no `golem-config.yml`: feito em 15/11/2026 (ver "Catálogo de temas"). Fica no YAML por enquanto; a ida para o banco será avaliada com o catálogo de rasters (ver Adiado).
 
 ### Situação do tema e módulo genérico (13/11/2026)
 
@@ -148,7 +148,7 @@ Ordem acordada:
 - **Situação do tema:** `verificar_tema()` roda a consulta e devolve um `resultado_tema`, com `situacao`, `dados` (tabela de resultado) e `erro`. Qualquer erro vira "não verificado"; tabela com linhas, "com interferência"; sem linhas, "sem interferência". Raster sem pixel com dado na área (fora do Brasil, mar aberto) fica "sem interferência".
 - **Na interface:** sem mudança visual. O tema não verificado mostra o motivo no lugar da tabela e um aviso na tela. Sem conexão ao banco, o aviso é único (o do início da sessão), e não um por tema.
 - **Planilha de conferência:** a aba "Resumo" traz todos os temas, com `Tema`, `Situação`, `Registros`, `Aba` e `Observação` (motivo da falha), com os não verificados no topo. Tema não verificado não tem aba própria.
-- **Ordem dos temas:** a ordem das chamadas no `app_server.R`, até o catálogo de temas (passo 5).
+- **Ordem dos temas:** a ordem do catálogo (ver "Catálogo de temas").
 
 ### Filtro espacial pelo polígono (13/11/2026)
 
@@ -192,6 +192,20 @@ Ordem acordada:
   - `area_km2()`: área com o s2, para mostrar na interface.
   - `parse_distancia()`: texto em km no formato brasileiro (vírgula decimal, ponto de milhar quando há vírgula; sem vírgula, o ponto é decimal; aceita "km" no fim).
   - `conferir_distancia()`: NULL ou a mensagem para o `validate()` do campo de distância.
+
+### Catálogo de temas (15/11/2026)
+
+- **Onde:** seção `temas` do `inst/golem-config.yml`, uma entrada por tema, na ordem em que aparecem na interface e na planilha de conferência. Substitui a lista fixa do `app_server.R` e do `app_ui.R`, a seção `temas` antiga (só chave e tabela) e as chaves soltas `mapbiomas_colecao` e `filtro_linhas_transmissao`.
+- **Campos:** `nome` (único; é o nome na interface e na planilha), `grupo` (item do menu), `subgrupo` (caixa na página do grupo; padrão: o grupo), `tipo` e os campos de cada tipo:
+  - `vetor_bd`: `tabela`; opcional `filtro` (expressão R em texto).
+  - `raster_bd`: `tabela`, `legenda` ("mapbiomas" ou "declividade"), `colecao` (MapBiomas), `ordem` ("percentagem" ou "classe") e `todas_classes`.
+  - `vetor_arquivo` (provisório, só a Hidrografia): `caminho` e `camada`, com `filtro` opcional.
+  - Todos: `colunas` opcional (colunas exibidas).
+- **Funções (`R/fct_catalogo.R`):** `catalogo_temas()` lê e confere o catálogo: campos obrigatórios, tipo conhecido e nomes únicos (o registro de resultados usa o nome). Um catálogo com problema impede o app de iniciar, com mensagem. `consulta_tema()` monta a função de consulta de cada tema pelo tipo, e `legenda_raster()` prepara a legenda dos rasters.
+- **Interface:** o `app_ui.R` monta o menu, as caixas e as abas a partir do catálogo. O HTML gerado foi comparado com o da versão anterior e é idêntico (fora os identificadores internos). Os módulos passaram a usar a chave do tema como identificador (ex.: `hidrografia` em vez de `curso_agua`).
+- **Colunas exibidas:** `colunas_exibidas()` aplica a lista `colunas` do tema na tabela da interface (e, no futuro, na síntese). Sem lista, saem só as colunas técnicas (`OBJECTID`, `Shape_Length`, `Shape_Area`, `GlobalID` etc.). A planilha de conferência traz todas. Nenhum tema tem lista ainda: falta definir as colunas de cada tema, com os nomes reais das tabelas.
+- **Novo tema:** basta uma entrada no catálogo, se o tipo já existir. Um tipo novo (ex.: outra legenda de raster) exige código em `consulta_tema()` ou `legenda_raster()`.
+- **`.Renviron.exemplo`:** criado, com as variáveis do banco, da Hidrografia e do banco de teste.
 
 - **`shinydashboard`:** continua no `DESCRIPTION` enquanto o app publicado usar essa interface. Sai na migração para `bslib`.
 

@@ -1,0 +1,18 @@
+# Modelo do .Renviron do app. Copie para .Renviron (fora do controle de
+# versão, ver .gitignore) e preencha. O golem-config.yml lê estas variáveis.
+
+# Conexão ao banco de produção (SQL Server, autenticação do Windows)
+ANALISE_BD_DRIVER=ODBC Driver 18 for SQL Server
+ANALISE_BD_SERVER=
+ANALISE_BD_DATABASE=
+
+# Tema ainda lido de arquivo: geodatabase da Hidrografia
+ANALISE_GDB_HIDROGRAFIA=
+
+# Banco de teste local, só para os testes de integração. Preenchido por
+# dev/bd_teste.sh em ~/.Renviron; o servidor precisa ser local.
+# ANALISE_BD_TESTE_DRIVER=
+# ANALISE_BD_TESTE_SERVER=127.0.0.1,1433
+# ANALISE_BD_TESTE_DATABASE=analise_teste
+# ANALISE_BD_TESTE_UID=sa
+# ANALISE_BD_TESTE_SENHA=

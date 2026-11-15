@@ -20,6 +20,7 @@ Imports:
     sf,
     shiny,
     shinydashboard,
+    stringi,
     stringr,
     terra,
     tools,

@@ -22,31 +22,3 @@ conectar_bd <- function(cfg = get_golem_config("bd")) {
                  Database = cfg$database,
                  Trusted_Connection = "Yes")
 }
-
-#' Nome da tabela de um tema no BD
-#'
-#' @param chave String. Chave do tema na seção `temas` do `golem-config.yml`.
-#'
-#' @return character
-#' @noRd
-tabela_tema <- function(chave) {
-
-  nome <- get_golem_config("temas")[[chave]]
-  if (is.null(nome) || nome == "") {
-    stop("Tema '", chave, "' sem tabela definida no golem-config.yml.")
-  }
-  nome
-}
-
-#' Filtro de linhas definido no golem-config.yml
-#'
-#' @param chave String. Chave do filtro no `golem-config.yml`.
-#'
-#' @return Expressão R (para `dplyr::filter(!!filtro)`) ou NULL.
-#' @noRd
-filtro_config <- function(chave) {
-
-  texto <- get_golem_config(chave)
-  if (is.null(texto) || texto == "") return(NULL)
-  rlang::parse_expr(texto)
-}

@@ -8,4 +8,6 @@ if(getRversion() >= "2.15.1") {
                            "COLUMN_NAME", "DATA_TYPE", "CHARACTER_MAXIMUM_LENGTH"))
 }
 
-
+#' Valor padrão para NULL (como o `%||%` do R >= 4.4 e do rlang)
+#' @noRd
+`%||%` <- function(x, y) if (is.null(x)) y else x

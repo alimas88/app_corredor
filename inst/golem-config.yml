@@ -11,44 +11,161 @@ default:
     server: !expr Sys.getenv("ANALISE_BD_SERVER")
     database: !expr Sys.getenv("ANALISE_BD_DATABASE")
 
-  # Nome da tabela (ou view) de cada tema no BD.
-  # Os valores abaixo são exemplos: substitua pelos nomes do seu banco.
+  # Catálogo de temas. A ordem aqui é a ordem dos temas na interface e na
+  # planilha de conferência. Campos de cada tema:
+  #   nome      nome do tema na interface e na planilha (único)
+  #   grupo     item do menu lateral
+  #   subgrupo  caixa dentro da página do grupo (padrão: o próprio grupo)
+  #   tipo      vetor_bd      tabela ou view vetorial no BD
+  #             raster_bd     raster de classes em tiles GeoTIFF no BD
+  #             vetor_arquivo provisório: camada lida de arquivo (Hidrografia)
+  #   tabela    tabela ou view no BD (vetor_bd e raster_bd). Os valores abaixo
+  #             são exemplos: substitua pelos nomes do seu banco.
+  #   colunas   opcional: colunas mostradas na interface e na síntese, nesta
+  #             ordem. Sem a lista, entram todas menos as técnicas (OBJECTID,
+  #             Shape_Length etc.). A planilha de conferência traz todas.
+  #   filtro    opcional (vetor_bd, vetor_arquivo): expressão R para filtrar as
+  #             feições, em texto (ex.: "situacao == 'Ativo'")
+  #   legenda   raster_bd: "mapbiomas" ou "declividade"
+  #   colecao   raster_bd com legenda mapbiomas: coleção do raster da tabela
+  #   ordem     raster_bd: "percentagem" (decrescente, padrão) ou "classe"
+  #   todas_classes  raster_bd: inclui com 0 as classes ausentes (padrão: não)
+  #   caminho, camada  vetor_arquivo: arquivo e camada
   temas:
-    municipios: TEMA_MUNICIPIOS
-    areas_urbanas: TEMA_AREAS_URBANAS
-    linhas_transmissao: TEMA_LINHAS_TRANSMISSAO
-    subestacoes: TEMA_SUBESTACOES
-    usinas: TEMA_USINAS
-    gasoduto_transporte: TEMA_GASODUTO_TRANSPORTE
-    duto_escoamento: TEMA_DUTO_ESCOAMENTO
-    gasoduto_distribuicao: TEMA_GASODUTO_DISTRIBUICAO
-    rodovias: TEMA_RODOVIAS
-    aerodromos: TEMA_AERODROMOS
-    ferrovias: TEMA_FERROVIAS
-    cavernas: TEMA_CAVERNAS
-    processos_minerarios: TEMA_PROCESSOS_MINERARIOS
-    terras_indigenas: TEMA_TERRAS_INDIGENAS
-    terras_quilombolas: TEMA_TERRAS_QUILOMBOLAS
-    assentamentos: TEMA_ASSENTAMENTOS
-    uc: TEMA_UNIDADES_CONSERVACAO
-    uc_complementar: TEMA_UNIDADES_CONSERVACAO_COMPLEMENTAR
-    rppn: TEMA_RPPN
-    sitios_arqueologicos: TEMA_SITIOS_ARQUEOLOGICOS
-    mapbiomas: MAPBIOMAS_TILES
-    declividade: DECLIVIDADE_TILES
-
-  # Coleção do MapBiomas gravada na tabela `temas$mapbiomas`
-  mapbiomas_colecao: 11
-
-  # Filtro opcional de linhas para o tema de linhas de transmissão, como
-  # expressão R em texto (ex.: "situacao == 'Ativo'"). Vazio = sem filtro.
-  filtro_linhas_transmissao: ~
-
-  # Tema ainda lido de arquivo (geodatabase), e não do BD.
-  # Caminho via variável de ambiente ANALISE_GDB_HIDROGRAFIA.
-  hidrografia:
-    gdb: !expr Sys.getenv("ANALISE_GDB_HIDROGRAFIA")
-    layer: TEMA_HIDROGRAFIA
+    municipios:
+      nome: Municípios
+      grupo: Infraestrutura
+      subgrupo: Político/Administrativo
+      tipo: vetor_bd
+      tabela: TEMA_MUNICIPIOS
+    areas_urbanas:
+      nome: Áreas Urbanas
+      grupo: Infraestrutura
+      subgrupo: Político/Administrativo
+      tipo: vetor_bd
+      tabela: TEMA_AREAS_URBANAS
+    linhas_transmissao:
+      nome: Linhas de Transmissão
+      grupo: Infraestrutura
+      subgrupo: Transmissão
+      tipo: vetor_bd
+      tabela: TEMA_LINHAS_TRANSMISSAO
+      filtro: ~
+    subestacoes:
+      nome: Subestações
+      grupo: Infraestrutura
+      subgrupo: Transmissão
+      tipo: vetor_bd
+      tabela: TEMA_SUBESTACOES
+    usinas:
+      nome: Usinas
+      grupo: Infraestrutura
+      subgrupo: Geração
+      tipo: vetor_bd
+      tabela: TEMA_USINAS
+    gasoduto_transporte:
+      nome: Gasoduto Transporte
+      grupo: Infraestrutura
+      subgrupo: Dutos
+      tipo: vetor_bd
+      tabela: TEMA_GASODUTO_TRANSPORTE
+    duto_escoamento:
+      nome: Dutos Escoamento
+      grupo: Infraestrutura
+      subgrupo: Dutos
+      tipo: vetor_bd
+      tabela: TEMA_DUTO_ESCOAMENTO
+    gasoduto_distribuicao:
+      nome: Gasoduto Distribuição
+      grupo: Infraestrutura
+      subgrupo: Dutos
+      tipo: vetor_bd
+      tabela: TEMA_GASODUTO_DISTRIBUICAO
+    rodovias:
+      nome: Rodovias
+      grupo: Infraestrutura
+      subgrupo: Transportes
+      tipo: vetor_bd
+      tabela: TEMA_RODOVIAS
+    aerodromos:
+      nome: Aeródromos
+      grupo: Infraestrutura
+      subgrupo: Transportes
+      tipo: vetor_bd
+      tabela: TEMA_AERODROMOS
+    ferrovias:
+      nome: Ferrovias
+      grupo: Infraestrutura
+      subgrupo: Transportes
+      tipo: vetor_bd
+      tabela: TEMA_FERROVIAS
+    mapbiomas:
+      nome: MapBiomas
+      grupo: Uso do Solo
+      tipo: raster_bd
+      tabela: MAPBIOMAS_TILES
+      legenda: mapbiomas
+      colecao: 11
+    hidrografia:
+      nome: Hidrografia
+      grupo: Meio Físico
+      tipo: vetor_arquivo
+      # caminho via variável de ambiente ANALISE_GDB_HIDROGRAFIA
+      caminho: !expr Sys.getenv("ANALISE_GDB_HIDROGRAFIA")
+      camada: TEMA_HIDROGRAFIA
+    cavernas:
+      nome: Cavernas
+      grupo: Meio Físico
+      tipo: vetor_bd
+      tabela: TEMA_CAVERNAS
+    declividade:
+      nome: Declividade
+      grupo: Meio Físico
+      tipo: raster_bd
+      tabela: DECLIVIDADE_TILES
+      legenda: declividade
+      ordem: classe
+      todas_classes: true
+    processos_minerarios:
+      nome: Processos Minerários
+      grupo: Processos Minerários
+      tipo: vetor_bd
+      tabela: TEMA_PROCESSOS_MINERARIOS
+    terras_indigenas:
+      nome: Terras Indígenas
+      grupo: Áreas Protegidas
+      tipo: vetor_bd
+      tabela: TEMA_TERRAS_INDIGENAS
+    terras_quilombolas:
+      nome: Terras Quilombolas
+      grupo: Áreas Protegidas
+      tipo: vetor_bd
+      tabela: TEMA_TERRAS_QUILOMBOLAS
+    assentamentos:
+      nome: Projetos de Assentamento
+      grupo: Áreas Protegidas
+      tipo: vetor_bd
+      tabela: TEMA_ASSENTAMENTOS
+    uc:
+      nome: Unidades de Conservação
+      grupo: Áreas Protegidas
+      tipo: vetor_bd
+      tabela: TEMA_UNIDADES_CONSERVACAO
+    uc_complementar:
+      nome: UC Complementar
+      grupo: Áreas Protegidas
+      tipo: vetor_bd
+      tabela: TEMA_UNIDADES_CONSERVACAO_COMPLEMENTAR
+    rppn:
+      nome: RPPN
+      grupo: Áreas Protegidas
+      tipo: vetor_bd
+      tabela: TEMA_RPPN
+    sitios_arqueologicos:
+      nome: Sítios Arqueológicos
+      grupo: Áreas Protegidas
+      tipo: vetor_bd
+      tabela: TEMA_SITIOS_ARQUEOLOGICOS
 
 production:
   app_prod: yes

@@ -6,6 +6,10 @@
 #' @import shinydashboard
 #' @noRd
 app_ui <- function(request) {
+
+  catalogo <- catalogo_temas()
+  grupos <- unique(purrr::map_chr(catalogo, "grupo"))
+
   tagList(
     # Leave this function for adding external resources
     golem_add_external_resources(),
@@ -18,113 +22,54 @@ app_ui <- function(request) {
                 style = "padding: 8px 15px;",
                 mod_exportar_ui("exportar"))
       ),
+      # Um item de menu por grupo do catálogo de temas (golem-config.yml)
       dashboardSidebar(
-        sidebarMenu(
-          menuItem('Corredor', tabName = 'painel_corredor'),
-          menuItem('Infraestrutura', tabName = 'infra'),
-          menuItem('Uso do Solo', tabName = 'uso_do_solo'),
-          menuItem('Meio Físico', tabName = 'meio_fisico'),
-          menuItem('Processos Minerários', tabName = 'processos_minerarios'),
-          menuItem('Áreas Protegidas', tabName = 'areas_protegidas')
-
-        )
+        do.call(sidebarMenu, c(
+          list(menuItem('Corredor', tabName = 'painel_corredor')),
+          purrr::map(grupos, \(g) menuItem(g, tabName = id_grupo(g)))
+        ))
       ),
       dashboardBody(
-        tabItems(
-          tabItem(tabName = 'painel_corredor', mod_corredor_ui("corredor")),
-
-          # UI para INFRAESTRUTURA
-          tabItem(tabName = 'infra',
-                  fluidPage(
-                    tabBox(
-                      title = 'Político/Administrativo', width = 12,
-                      tabPanel('Municípios', mod_tema_ui('infra_municipio')),
-                      tabPanel('Áreas Urbanas', mod_tema_ui('infra_area_urbana'))
-                    ),
-
-                    tabBox(
-                      title = 'Transmissão', width = 12,
-                      tabPanel('Linhas de Transmissão', mod_tema_ui('infra_lt')),
-                      tabPanel('Subestações', mod_tema_ui('subestacao'))
-                    ),
-
-                    tabBox(
-                      title = 'Geração', width = 12,
-                      tabPanel('Usinas', mod_tema_ui('usinas'))
-                    ),
-
-                    tabBox(
-                      title = 'Dutos', width = 12,
-                      tabPanel('Gasoduto Transporte', mod_tema_ui('gasoduto_transporte')),
-                      tabPanel('Dutos Escoamento', mod_tema_ui('duto_escoamento')),
-                      tabPanel('Gasoduto Distribuição', mod_tema_ui('gasoduto_distribuicao'))
-                    ),
-
-                    tabBox(
-                      title = 'Transportes', width = 12,
-                      tabPanel('Rodovias', mod_tema_ui('transportes_rodovias')),
-                      tabPanel('Aeródromos', mod_tema_ui('transportes_aerodromos')),
-                      tabPanel('Ferrovias', mod_tema_ui('transportes_ferrovias'))
-                    )
-                  )
-          ),
-
-
-          # UI para USO DO SOLO
-          tabItem(tabName = 'uso_do_solo',
-                  fluidPage(
-                    tabBox(
-                      title = 'Uso do Solo', width = 12,
-                      tabPanel('MapBiomas', mod_tema_ui('mapbiomas'))
-                    )
-                  )
-          ),
-
-
-          # UI para MEIO FÍSICO
-          tabItem(tabName = 'meio_fisico',
-                  fluidPage(
-                    tabBox(
-                      title = 'Meio Físico', width = 12,
-                      tabPanel("Hidrografia", mod_tema_ui('curso_agua')),
-                      tabPanel('Cavernas', mod_tema_ui('caverna')),
-                      tabPanel('Declividade', mod_tema_ui('declividade'))
-                    )
-                  )
-          ),
-
-
-          # UI para PROCESSOS MINERÁRIOS
-          tabItem(tabName = 'processos_minerarios',
-                  fluidPage(
-                    tabBox(
-                      title = 'Processos Minerários', width = 12,
-                      tabPanel('Processos Minerários', mod_tema_ui('pm'))
-                    )
-                  )
-          ),
-
-
-          # UI para ÁREAS PROTEGIDAS
-          tabItem(tabName = 'areas_protegidas',
-                  fluidPage(
-                    tabBox(
-                      title = 'Áreas Protegidas', width = 12,
-                      tabPanel('Terras Indígenas', mod_tema_ui('terra_indigena')),
-                      tabPanel('Terras Quilombolas', mod_tema_ui('terra_quilombola')),
-                      tabPanel('Projetos de Assentamento', mod_tema_ui('projeto_assentamento')),
-                      tabPanel('Unidades de Conservação', mod_tema_ui('uc')),
-                      tabPanel('UC Complementar', mod_tema_ui('uc_complementar')),
-                      tabPanel('RPPN', mod_tema_ui('rppn')),
-                      tabPanel('Sítios Arqueológicos', mod_tema_ui('sitios_arqueologicos'))
-                    )
-                  )
-          )
-
-        )
+        do.call(tabItems, c(
+          list(tabItem(tabName = 'painel_corredor', mod_corredor_ui("corredor"))),
+          purrr::map(grupos, \(g) pagina_grupo(g, catalogo))
+        ))
       )
     )
   )
+}
+
+#' Página de um grupo de temas
+#'
+#' @description Uma caixa (`tabBox`) por subgrupo, com uma aba por tema, na
+#' ordem do catálogo.
+#'
+#' @param grupo String. Grupo do catálogo.
+#' @param catalogo Saída de `catalogo_temas()`.
+#' @noRd
+pagina_grupo <- function(grupo, catalogo) {
+
+  temas <- purrr::keep(catalogo, \(t) t$grupo == grupo)
+  subgrupos <- unique(purrr::map_chr(temas, "subgrupo"))
+
+  caixas <- purrr::map(subgrupos, function(sg) {
+    abas <- temas |>
+      purrr::keep(\(t) t$subgrupo == sg) |>
+      purrr::map(\(t) tabPanel(t$nome, mod_tema_ui(t$chave))) |>
+      unname()
+    do.call(tabBox, c(list(title = sg, width = 12), abas))
+  })
+
+  tabItem(tabName = id_grupo(grupo), do.call(fluidPage, unname(caixas)))
+}
+
+#' Identificador do grupo para o menu (ex.: "Meio Físico" -> "meio_fisico")
+#' @noRd
+id_grupo <- function(grupo) {
+  grupo |>
+    stringi::stri_trans_general("Latin-ASCII") |>
+    tolower() |>
+    stringr::str_replace_all("[^a-z0-9]+", "_")
 }
 
 #' Add external Resources to the Application
