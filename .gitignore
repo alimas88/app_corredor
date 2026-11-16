@@ -1,0 +1,6 @@
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+# conexão ao banco e outros dados sensíveis (ver .Renviron.exemplo)
+.Renviron

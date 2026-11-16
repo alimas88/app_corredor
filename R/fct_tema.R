@@ -65,17 +65,20 @@ parar_sem_conexao <- function() {
 
 #' Interferências de um tema vetorial do BD
 #'
-#' @description Consulta no SQL Server as feições do tema dentro do retângulo
-#' envolvente da área de estudo e filtra, no R, as que intersectam a área.
+#' @description Consulta no SQL Server só as feições do tema que intersectam o
+#' polígono da área de estudo (e não o retângulo envolvente, que numa LT longa e
+#' diagonal traz muito mais feições). A geometria vem em WKB, mais leve que o
+#' WKT e sem perda de precisão, e a coluna `Shape` original não é trazida.
 #'
-#' O filtro de interseção usa o GEOS (s2 desligado só aqui): o s2 rejeita alguns
-#' polígonos que são válidos pelas regras OGC (ver "Geometrias inválidas para o
-#' s2" em `dev/DECISOES.md`). Para um predicado de interseção, o resultado é na
-#' prática o mesmo do cálculo esférico.
+#' Depois da consulta, o filtro de interseção é refeito no R com o GEOS (s2
+#' desligado só aqui), como garantia: o s2 rejeita alguns polígonos que são
+#' válidos pelas regras OGC (ver "Geometrias inválidas para o s2" em
+#' `dev/DECISOES.md`). O SQL Server e o GEOS calculam no plano, então os dois
+#' filtros dão o mesmo resultado.
 #'
 #' @param con Conexão DBI ao SQL Server. NULL se a conexão falhou.
-#' @param tabela String. Tabela ou view do tema.
-#' @param area sf com a área de estudo, em EPSG:4674.
+#' @param tabela String. Tabela ou view do tema (aceita `esquema.tabela`).
+#' @param area sf ou sfc com a área de estudo, em EPSG:4674.
 #' @param filtro_row Expressão para `dplyr::filter()` (ex.: retirar feições
 #'   inativas), ou NULL.
 #'
@@ -85,18 +88,16 @@ consultar_tema_bd <- function(con, tabela, area, filtro_row = NULL) {
 
   if (is.null(con)) parar_sem_conexao()
 
-  filtro_bbox <- sf::st_as_text(sf::st_as_sfc(sf::st_bbox(area)))
+  area <- sf::st_union(sf::st_geometry(area))
+  colunas <- colunas_tema_bd(con, tabela)
 
+  # A coluna da geometria em WKB (varbinary(max)) vai por último (driver ODBC)
   base_tema <- DBI::dbGetQuery(con, glue::glue(
-    "SELECT *, ",
-    "Shape.STAsText() AS wkt ",
+    "SELECT {colunas}, Shape.STAsBinary() AS wkb ",
     "FROM {tabela} ",
-    "WHERE Shape.STIntersects(",
-    "geometry::STGeomFromText('{filtro_bbox}', 4674)",
-    ") = 1;"
+    "WHERE Shape.STIntersects({sql_geometria(area)}) = 1;"
   )) |>
-    dplyr::mutate(Shape = sf::st_as_sfc(wkt, crs = 4674)) |>
-    dplyr::select(-dplyr::any_of(c("wkt", "GDB_GEOMATTR_DATA"))) |>
+    dplyr::mutate(Shape = ler_wkb(wkb), .keep = "unused") |>
     sf::st_as_sf()
 
   if (!is.null(filtro_row)) {
@@ -107,6 +108,74 @@ consultar_tema_bd <- function(con, tabela, area, filtro_row = NULL) {
   on.exit(suppressMessages(sf::sf_use_s2(s2_antes)), add = TRUE)
   # sem o aviso "st_intersects assumes that they are planar": é intencional
   suppressMessages(sf::st_filter(base_tema, area, .predicate = sf::st_intersects))
+}
+
+#' Colunas de atributos de um tema do BD, prontas para o SELECT
+#'
+#' @description Lista as colunas da tabela ou view, sem a geometria (`Shape`,
+#' trazida à parte em WKB), as colunas de tipo espacial e a
+#' `GDB_GEOMATTR_DATA` (dado interno do ArcGIS). As colunas de tamanho máximo
+#' (`varchar(max)`, `nvarchar(max)`, `varbinary(max)`) vão para o fim: o driver
+#' ODBC do SQL Server exige que elas venham depois das demais.
+#'
+#' @param con Conexão DBI ao SQL Server.
+#' @param tabela String. Tabela ou view (aceita `esquema.tabela`).
+#'
+#' @return String com os nomes entre colchetes, separados por vírgula.
+#' @noRd
+colunas_tema_bd <- function(con, tabela) {
+
+  colunas <- DBI::dbGetQuery(con, glue::glue(
+    "SELECT COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH ",
+    "FROM INFORMATION_SCHEMA.COLUMNS ",
+    "WHERE TABLE_NAME = PARSENAME('{tabela}', 1) ",
+    "AND (PARSENAME('{tabela}', 2) IS NULL OR TABLE_SCHEMA = PARSENAME('{tabela}', 2)) ",
+    "ORDER BY ORDINAL_POSITION;"
+  ))
+
+  if (nrow(colunas) == 0) {
+    stop("tabela ", tabela, " não encontrada no banco.")
+  }
+
+  colunas <- colunas |>
+    dplyr::filter(
+      !tolower(COLUMN_NAME) %in% c("shape", "gdb_geomattr_data"),
+      !tolower(DATA_TYPE) %in% c("geometry", "geography")
+    ) |>
+    dplyr::arrange(dplyr::coalesce(CHARACTER_MAXIMUM_LENGTH == -1, FALSE))
+
+  if (nrow(colunas) == 0) return("NULL AS sem_atributos")
+
+  paste0("[", stringr::str_replace_all(colunas$COLUMN_NAME, stringr::fixed("]"), "]]"), "]",
+         collapse = ", ")
+}
+
+#' Geometria da área de estudo em SQL
+#'
+#' @description Expressão `geometry` do SQL Server com o polígono da área de
+#' estudo, com todas as casas decimais (o padrão do `st_as_text()` arredonda
+#' para 7 algarismos significativos, ~1 m) e `MakeValid()`.
+#'
+#' @param area sfc com a área de estudo, já no SRID `srid`.
+#' @param srid SRID da geometria no banco.
+#'
+#' @return String.
+#' @noRd
+sql_geometria <- function(area, srid = 4674) {
+  wkt <- sf::st_as_text(sf::st_union(sf::st_geometry(area)), digits = 15)
+  glue::glue("geometry::STGeomFromText('{wkt}', {srid}).MakeValid()")
+}
+
+#' Converte a geometria WKB lida do banco em sfc
+#'
+#' @param wkb Lista de vetores raw (ou `blob`), como o ODBC devolve
+#'   `varbinary(max)`.
+#' @param crs CRS da geometria.
+#'
+#' @return sfc.
+#' @noRd
+ler_wkb <- function(wkb, crs = 4674) {
+  sf::st_as_sfc(structure(lapply(wkb, as.raw), class = "WKB"), crs = crs)
 }
 
 #' Interferências de um tema vetorial lido de arquivo

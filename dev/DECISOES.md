@@ -1,13 +1,13 @@
 # analise.corredor: decisões e pendências
 
-Registro das decisões da sessão de definição de 21/10/2026, atualizado em 10, 11, 12 e 13/11/2026 com as decisões sobre rasters, legendas do MapBiomas, declividade, geometrias inválidas para o s2, validação do envio da área de estudo, testes automatizados e ordem dos próximos passos. O vocabulário está em `dev/CONTEXT.md`.
+Registro das decisões da sessão de definição de 21/10/2026, atualizado em 10, 11, 12 e 13/11/2026 com as decisões sobre rasters, legendas do MapBiomas, declividade, geometrias inválidas para o s2, validação do envio da área de estudo, testes automatizados, ordem dos próximos passos, filtro espacial pelo polígono, leitura do traçado com buffer geodésico, banco de teste local e catálogo de temas. O vocabulário está em `dev/CONTEXT.md`.
 
 ## Decidido
 
 - **Objetivo:** otimizar e viabilizar a publicação do app. Os temas entram aos poucos.
-- **Área de estudo:** uma por análise. Gerada por buffer do traçado (ponto, linha ou ambos) ou enviada pronta. Polígono enviado é usado como veio, e a distância de buffer fica desabilitada.
+- **Área de estudo:** uma por análise. Gerada por buffer do traçado (ponto ou linha) ou enviada pronta. Polígono enviado é usado como veio, e a distância de buffer fica desabilitada.
 - **Distância de buffer:** única para todos os temas. Testa-se um valor por vez: alterar a distância recalcula e descarta os resultados anteriores.
-- **SE + LT em conjunto:** permitido. O usuário envia os dois traçados ou uma área de estudo pronta, e o app une tudo em um só polígono.
+- **Vários empreendimentos juntos (ex.: seccionamento curto perto de uma SE planejada):** o app não tem tratamento especial. O analista monta a geometria e envia uma só: um polígono que engloba os empreendimentos (geralmente uma circunferência) ou um ponto central para o app gerar o buffer (revisto em 13/11/2026; antes, o app uniria os traçados de SE e LT).
 - **Interferência:** só o que intersecta diretamente a área de estudo. A faixa de proximidade (ex.: aeródromos a 3 km) não será implantada agora.
 - **Situação do tema:** três estados (com interferência, sem interferência, não verificado). Temas não verificados aparecem em destaque na síntese e na planilha, e a geração do Word avisa antes de exportar.
 - **Saídas:** planilha de conferência (xlsx, uma aba por tema) e síntese das interferências (Word de apoio, uma tabela por tema com o nome do tema). Por ora, sem resumos nem regras por tema.
@@ -16,10 +16,10 @@ Registro das decisões da sessão de definição de 21/10/2026, atualizado em 10
 - **Declividade:** % da área de estudo por classe, no mesmo formato do MapBiomas. Fonte: Topodata SC (INPE, ~30 m, 6 classes Embrapa) (decisão de 11/11/2026). Detalhes na seção "Declividade: Topodata SC".
 - **Dados vetoriais:** a meta é ler tudo do SQL Server. Os temas ainda lidos de arquivo ganham views no banco.
 - **Colunas exibidas:** lista de colunas por tema no catálogo, usada na síntese e na interface. É configuração, não regra de resumo. Sem lista, entram todas as colunas menos as técnicas. A planilha de conferência traz todas.
-- **Sistema de referência:** buffer e áreas calculados de forma geodésica em SIRGAS 2000 geográfico (4674), com `sf` + `s2`. Não depende de fuso. Os valores podem diferir um pouco dos do ArcGIS/QGIS. Exceção: o filtro de interseção dos temas vetoriais do BD usa GEOS (decisão de 12/11/2026, ver "Geometrias inválidas para o s2").
+- **Sistema de referência:** buffer e áreas calculados de forma geodésica em SIRGAS 2000 geográfico (4674). Não depende de fuso. As áreas são calculadas com `sf` + `s2`, na esfera, e podem diferir um pouco das do ArcGIS/QGIS. O buffer é calculado no elipsoide GRS80, por trechos em projeção azimutal equidistante, porque o buffer do s2 é impreciso (decisão de 14/11/2026, ver "Buffer geodésico"). Exceção: o filtro de interseção dos temas vetoriais do BD usa GEOS (decisão de 12/11/2026, ver "Geometrias inválidas para o s2").
 - **Distância de buffer na interface:** em km, com decimais (ex.: 0,04 km = 40 m, faixa de servidão). Campo vazio por padrão, aceita qualquer valor positivo e não tem limite máximo. O app também serve a outros usos, como a faixa de servidão.
 - **Framework de UI:** a reestruturação é feita em `bslib` (decisão de 21/10/2026, substitui a preferência anterior por `bs4Dash`).
-- **Entrada:** `.zip` (shapefile), `.kml/.kmz`, `.gpkg` e `.zip` com `.gdb`. Com várias camadas, o usuário escolhe uma. O tipo de geometria detectado define se a distância é obrigatória (ponto e linha) ou fica desabilitada (polígono).
+- **Entrada:** `.zip` (shapefile), `.kml/.kmz`, `.gpkg` e `.zip` com `.gdb`. Com várias camadas, o usuário escolhe uma. O tipo de geometria detectado define se a distância é obrigatória (ponto e linha) ou fica desabilitada (polígono). A camada deve ter uma única feição: mais de uma é recusada, inclusive uma LT em vários segmentos, para que o analista tenha plena consciência do que entra no app (decisão de 14/11/2026).
 - **Mapa:** módulo próprio (`mod_mapa`), separado do módulo do traçado. Mostra o traçado, a área de estudo e as interferências por tema em camadas que se ligam e desligam, com popups e legenda. O mapa estático na síntese fica para depois.
 - **Telas:** navegação por barra superior (`page_navbar`), com barra lateral só na página Análise. Validado no protótipo v2 (`dev/prototipos/prototipo_sintese.html`).
   - **Análise:** barra lateral com envio do arquivo, escolha de camada, geometria detectada, distância e botões; mapa ao lado.
@@ -43,7 +43,7 @@ Registro das decisões da sessão de definição de 21/10/2026, atualizado em 10
 - **Carga:** `data-raw/carga_mapbiomas_col11_2025.R`. Resultado da carga da Coleção 11 (2025): ~9.700 tiles, ~660 MB de GeoTIFF, todos com MD5 conferido. O raster equivalente em geodatabase, sem compressão, ocupa cerca de 20 GB.
 - **Leitura:** `contar_raster_bd()` (`R/fct_raster_bd.R`) busca os tiles que intersectam o polígono da área de estudo, monta um mosaico virtual (VRT) e conta os pixels por classe com `crop(mask = TRUE, touches = FALSE)` + `freq()`. Validada em 11/11/2026 contra o `.tif` original em quatro áreas (corredores, litoral e canto entre tiles), com contagens idênticas.
 - **Contagem no `terra`, não `extract`:** num corredor de 10,5 milhões de pixels, o `extract` + `count` levou 28,6 s no `.tif` local, contra 7,7 s do `crop` + `mask` + `freq`. A regra `touches = FALSE` (pixel entra se o centro está na área) é a mesma do `extract`; com `touches = TRUE`, o padrão do `mask`, entram ~0,2% a mais de pixels, os da borda. As duas formas diferiram em 1 pixel em 10,5 milhões, um empate de centro sobre a borda.
-- **Função:** `resumir_raster_bd()` (`R/fct_raster_bd.R`), genérica para qualquer raster de classes em tiles no BD, exibida pelo `mod_tema` (decisão de 12/11/2026, revista em 13/11/2026: o `mod_raster_bd` virou função pura, ver "Situação do tema e módulo genérico"). Recebe `tabela`, `legenda` (`class_id`, `descricao`, `color` e colunas extras a exibir), `tema` (nome usado nas mensagens), `ordem` ("percentagem" decrescente ou "classe", a ordem da legenda) e `todas_classes` (inclui com 0 as classes ausentes na área). A legenda é preparada no `app_server.R` e conferida por `validar_legenda()`.
+- **Função:** `resumir_raster_bd()` (`R/fct_raster_bd.R`), genérica para qualquer raster de classes em tiles no BD, exibida pelo `mod_tema` (decisão de 12/11/2026, revista em 13/11/2026: o `mod_raster_bd` virou função pura, ver "Situação do tema e módulo genérico"). Recebe `tabela`, `legenda` (`class_id`, `descricao`, `color` e colunas extras a exibir), `tema` (nome usado nas mensagens), `ordem` ("percentagem" decrescente ou "classe", a ordem da legenda) e `todas_classes` (inclui com 0 as classes ausentes na área). A legenda é preparada por `legenda_raster()` (`R/fct_catalogo.R`), a partir do campo `legenda` do tema no catálogo, e conferida por `validar_legenda()`.
 - **Outros softwares:** ArcGIS e QGIS enxergam a tabela só como polígonos (o contorno dos tiles). Ela é feita para o app.
 - **FME:** os writers de SQL Server do FME não gravam raster. Se a atualização passar para o FME, o caminho é `RasterTiler` + `RasterExtractor` (GeoTIFF) + writer MSSQL, mantendo a mesma estrutura de tabela.
 
@@ -52,7 +52,7 @@ Registro das decisões da sessão de definição de 21/10/2026, atualizado em 10
 - **Estrutura:** `legenda_mapbiomas` empilha as legendas de todas as coleções, com as colunas `colecao`, `class_id`, `level`, `descricao` e `color` (decisão de 10/11/2026, revista em 11/11/2026: saiu `descricao_en`, que nenhuma das legendas guardadas tem). Cada coleção mantém a estrutura da Coleção 10. As coleções antigas não são apagadas, para permitir análises comparativas entre versões.
 - **Fontes:** os CSVs ficam em `data-raw/legendas_mapbiomas/`, um por coleção (`colecao_<n>.csv`), todos no mesmo formato (`class_id`, `level`, `descricao`, `color`, UTF-8), e são permanentes. A Coleção 10 foi exportada do `.rda` anterior. A Coleção 11 foi montada a partir do PDF oficial (de 13/08/2026), porque o CSV oficial só tem as 33 classes finais, sem nível, e tem erros de grafia. `data-raw/atualizacao_legenda.R` lê todos os `colecao_<n>.csv` da pasta, sem download, confere e gera o `.rda`.
 - **Coleção 11 (montada em 11/11/2026):** 41 classes (33 finais e 8 agregadoras), com `level` de 1 a 4, nomes e cores do PDF, na ordem hierárquica dele. Na classe 22, mantida a grafia da Coleção 10, "Área não Vegetada" (o PDF usa "não vegetada"). Em relação à Coleção 10: 5 classes novas (7, 77, 84, 75, 91), 1 removida (27, "Não observado"), 1 renomeada (50, "Restinga Herbácea ou Arbustiva") e cores diferentes nas classes 1, 6, 10, 14, 26, 29 e 50 (29 e 50 trocaram de cor entre si).
-- **Uso no app:** o `app_server.R` filtra a `legenda_mapbiomas` pela coleção configurada (`mapbiomas_colecao` no `golem-config.yml`) e passa o resultado ao `resumir_raster_bd()`. Uma legenda vazia (coleção sem legenda) impede a análise, com mensagem.
+- **Uso no app:** `legenda_raster()` filtra a `legenda_mapbiomas` pela coleção do tema no catálogo (campo `colecao` do tema `mapbiomas` no `golem-config.yml`; até 14/11/2026, `mapbiomas_colecao`) e o resultado vai ao `resumir_raster_bd()`. Uma legenda vazia (coleção sem legenda) impede a análise, com mensagem.
 - **Nova coleção (provisório):** montar o `colecao_<n>.csv` no formato padrão a partir da legenda oficial, salvar na pasta, rodar o script e trocar a tabela e a coleção no `golem-config.yml`. Esse fluxo ainda exige publicar o app a cada coleção (ver "Versão do MapBiomas fixa na configuração", em Adiado).
 
 ### Declividade: Topodata SC
@@ -76,7 +76,7 @@ Registro das decisões da sessão de definição de 21/10/2026, atualizado em 10
 - **Legenda:** `legenda_declividade` (`data-raw/legenda_declividade.csv` → `data-raw/legenda_declividade.R`), com `class_id`, `descricao`, `lim_inf`, `lim_sup` (em %, intervalo [lim_inf, lim_sup)) e `color`. Nomes e limites do sistema Embrapa (0–3, 3–8, 8–20, 20–45, 45–75, >75%). A simbologia oficial do Topodata só tem rótulos "1" a "6" e tons de cinza, então as cores seguem uma rampa verde → vermelho escuro.
 - **Carga:** mesma estrutura de tabela do MapBiomas. Por causa da máscara, os tiles são gerados um a um, na mesma grade e numeração do `makeTiles`. O script de carga tem um modo teste (`modo_teste = TRUE`), que faz o caminho inteiro só com a folha de teste numa tabela `TESTE_` e confere a leitura com `contar_raster_bd()`.
 - **Teste de carga (11/11/2026, folha 22S435):** 28 tiles, 2,7 MB (~100 KB por tile), sem binário corrompido nem geometria com problema. A máscara retirou 1,19 milhão de pixels (~6% da folha), quase todos de Plano e Suave ondulado: só 42 pixels de Escarpado saíram, sinal de que cortou o mar e não as encostas. Numa área de teste de 2 km em torno de uma linha que cruza baixada, serra e costa, a contagem lida do banco por `contar_raster_bd()` foi idêntica à dos tiles locais nas 6 classes (893.126 pixels), desde que a referência local use a mesma geometria da função (`st_union()` + `st_make_valid()`): sem isso, 2 pixels com centro sobre a borda trocaram de lado.
-- **No app (12/11/2026):** aba "Declividade" em Meio Físico, com o `resumir_raster_bd()`. A tabela traz sempre as 6 classes, na ordem Plano → Escarpado, com 0 nas ausentes e a coluna `faixa` (ex.: "0 a 3%", "> 75%"), montada no `app_server.R` a partir de `lim_inf` e `lim_sup`. Falta testar no app em execução.
+- **No app (12/11/2026):** aba "Declividade" em Meio Físico, com o `resumir_raster_bd()`. A tabela traz sempre as 6 classes, na ordem Plano → Escarpado, com 0 nas ausentes e a coluna `faixa` (ex.: "0 a 3%", "> 75%"), montada por `legenda_raster()` a partir de `lim_inf` e `lim_sup`. Falta testar no app em execução.
 - **Carga completa (11/11/2026):** ~9.200 tiles, ~760 MB de GeoTIFF, todos com MD5 conferido, sem geometria com problema, com índice espacial. A gravação no banco levou 11 minutos.
 
 ### Geometrias inválidas para o s2: filtro de interseção com GEOS
@@ -106,7 +106,7 @@ Registro das decisões da sessão de definição de 21/10/2026, atualizado em 10
 ### Envio da área de estudo: conferência do .zip (13/11/2026)
 
 - **Problema:** o `mod_corredor` tentava ler qualquer `.zip` e derrubava a sessão quando não havia shapefile dentro. Depois de um envio inválido, a mensagem de erro continuava na tela mesmo após um envio válido.
-- **Leitura:** `ler_corredor()` (`R/fct_corredor.R`) confere o `.zip` antes de ler, com uma mensagem por problema: arquivo que não é `.zip` ou está corrompido; nenhum `.shp` ou mais de um; falta de `.dbf`, `.shx` ou `.prj` (sem `.prj`, a reprojeção quebrava); shapefile ilegível ou sem feições; `.prj` não reconhecido; geometria que não é polígono; mais de uma feição; feição sem geometria. O shapefile pode estar numa pasta dentro do `.zip`, e os arquivos de controle do macOS (`__MACOSX/`, `._*`) são ignorados. Os erros previstos têm a classe `erro_corredor`; qualquer outro erro vira uma mensagem genérica, sem derrubar a sessão.
+- **Leitura:** `ler_corredor()` (desde 14/11/2026, em `R/fct_tracado.R`, chamando `ler_tracado()`) confere o `.zip` antes de ler, com uma mensagem por problema: arquivo que não é `.zip` ou está corrompido; nenhum `.shp` ou mais de um; falta de `.dbf`, `.shx` ou `.prj` (sem `.prj`, a reprojeção quebrava); shapefile ilegível ou sem feições; `.prj` não reconhecido; geometria que não é polígono; mais de uma feição; feição sem geometria. O shapefile pode estar numa pasta dentro do `.zip`, e os arquivos de controle do macOS (`__MACOSX/`, `._*`) são ignorados. Os erros previstos têm a classe `erro_entrada` (até 13/11/2026, `erro_corredor`); qualquer outro erro vira uma mensagem genérica, sem derrubar a sessão.
 - **Mensagem:** numa caixa própria acima do mapa, substituída a cada envio e apagada quando o envio dá certo. O mapa nunca recebe erro: mostra o Brasil sem corredor e o polígono com corredor. A causa da mensagem persistente não foi reproduzida; a hipótese é que o erro ia para o próprio `leafletOutput`, que não o limpava ao renderizar de novo.
 - **Envio inválido descarta o corredor anterior:** o mapa volta ao Brasil, e as tabelas dos temas ficam vazias (param no `req()`) e saem da planilha exportada até o próximo envio válido. Motivo: não manter na tela resultados de um arquivo que não é o último enviado. Para manter o anterior, trocar `corredor(lido$sf)` por `if (!is.null(lido$sf)) corredor(lido$sf)` no `mod_corredor.R`.
 - **Provisório:** vale até a reestruturação da entrada (`.kml/.kmz`, `.gpkg`, `.gdb` e traçado com buffer, ver "Entrada" e "Fluxo do buffer"). A conferência do shapefile deve ser reaproveitada lá.
@@ -119,6 +119,16 @@ Registro das decisões da sessão de definição de 21/10/2026, atualizado em 10
 - **`contar_raster_bd()` sem banco:** o `DBI::dbGetQuery()` é simulado com `local_mocked_bindings()` e devolve tiles GeoTIFF gerados no teste. A contagem é comparada com a do raster inteiro, como na validação de 11/11/2026.
 - **Área de estudo de teste:** gerada em `tests/testthat/helper-area_estudo.R` (buffer de 2,5 km de uma linha inventada no Brasil Central). Substitui o objeto `corredor`, que estava documentado mas não existia em `data/`.
 - **`coletar_resultados()`:** passou a avaliar cada resultado com `isolate()`, para rodar também fora de um contexto reativo.
+- **Testes de integração (15/11/2026):** `tests/testthat/test-integracao_bd.R` roda as consultas reais num SQL Server local (ver "Banco de teste local"). Sem as variáveis `ANALISE_BD_TESTE_*`, eles são pulados, e o `devtools::test()` continua rodando sem banco.
+
+### Banco de teste local (15/11/2026)
+
+- **Motivo:** os passos 2 e 3 mudaram as consultas ao banco, e elas só tinham sido testadas com o `DBI` simulado. Um PostgreSQL não serviria, porque a sintaxe espacial é outra (`ST_Intersects` em vez de `Shape.STIntersects`).
+- **O que é:** SQL Server 2022 (edição Developer, gratuita para desenvolvimento e teste) em Docker, com a imagem oficial `mcr.microsoft.com/mssql/server:2022-latest`. A versão de produção deve ser a 2022 (a confirmar). O pacote para Ubuntu 24.04 só existe na versão 2025, por isso o Docker. Licença da Microsoft aceita em 15/11/2026.
+- **Como subir:** `bash dev/bd_teste.sh`. Inicia o Docker se preciso, cria ou reinicia o container, cria o banco `analise_teste` e grava a conexão em `~/.Renviron` (fora do repositório): `ANALISE_BD_TESTE_DRIVER`, `_SERVER`, `_DATABASE`, `_UID` e `_SENHA`. A senha é local, gerada na primeira execução e guardada em `~/.analise_bd_teste`. Exige o driver ODBC 18 (`msodbcsql18`).
+- **Segurança:** o banco só escuta em `127.0.0.1`. Os testes de integração se recusam a rodar se `ANALISE_BD_TESTE_SERVER` não for local, para que nunca rodem contra o banco de produção. As tabelas usam o prefixo `TESTE_` e são apagadas ao fim de cada teste.
+- **O que os testes conferem no SQL Server real:** `consultar_tema_bd()` com o filtro pelo polígono (uma feição dentro do retângulo envolvente e fora do corredor não vem), o WKB, a ordem das colunas `(max)` exigida pelo driver ODBC, esquema (`dbo.`) e view, o filtro de linhas, tabela inexistente ("não verificado") e `contar_raster_bd()` e `resumir_raster_bd()` com tiles GeoTIFF gravados no banco, conferidos contra o raster original.
+- **Não substitui o banco de produção:** os dados são sintéticos. Desempenho, geometrias reais inválidas para o s2, permissões e a medição do passo 3 continuam dependendo do banco de produção.
 
 ### Próximos passos sem alteração da UI (definidos em 13/11/2026)
 
@@ -126,9 +136,9 @@ Ordem acordada:
 
 1. Testes automatizados e limpeza: feito em 13/11/2026. Saíram `query_bd()` (sem uso), o objeto `corredor` (documentação sem dado) e `data-raw/corredor.R`.
 2. Separar a consulta de cada tema da exibição e implementar a situação do tema: feito em 13/11/2026 (ver "Situação do tema e módulo genérico").
-3. Filtro espacial dos temas vetoriais pelo polígono da área de estudo, e não pelo bbox, com a geometria em WKB (`STAsBinary`) em vez de WKT.
-4. Funções de entrada e buffer (`ler_tracado()`, `gerar_area_estudo()`, `parse_distancia()`), sem ligar na UI.
-5. Catálogo de temas no `golem-config.yml` (chave, nome, grupo, tipo, colunas exibidas), substituindo a lista fixa do `app_server.R`. Fica no YAML por enquanto; a ida para o banco será avaliada com o catálogo de rasters (ver Adiado).
+3. Filtro espacial dos temas vetoriais pelo polígono da área de estudo, com a geometria em WKB: feito em 13/11/2026 (ver "Filtro espacial pelo polígono"). Falta medir o ganho com o banco.
+4. Funções de entrada e buffer, sem ligar na UI: feito em 14/11/2026 (ver "Leitura do traçado" e "Buffer geodésico").
+5. Catálogo de temas no `golem-config.yml`: feito em 15/11/2026 (ver "Catálogo de temas"). Fica no YAML por enquanto; a ida para o banco será avaliada com o catálogo de rasters (ver Adiado).
 
 ### Situação do tema e módulo genérico (13/11/2026)
 
@@ -138,7 +148,64 @@ Ordem acordada:
 - **Situação do tema:** `verificar_tema()` roda a consulta e devolve um `resultado_tema`, com `situacao`, `dados` (tabela de resultado) e `erro`. Qualquer erro vira "não verificado"; tabela com linhas, "com interferência"; sem linhas, "sem interferência". Raster sem pixel com dado na área (fora do Brasil, mar aberto) fica "sem interferência".
 - **Na interface:** sem mudança visual. O tema não verificado mostra o motivo no lugar da tabela e um aviso na tela. Sem conexão ao banco, o aviso é único (o do início da sessão), e não um por tema.
 - **Planilha de conferência:** a aba "Resumo" traz todos os temas, com `Tema`, `Situação`, `Registros`, `Aba` e `Observação` (motivo da falha), com os não verificados no topo. Tema não verificado não tem aba própria.
-- **Ordem dos temas:** a ordem das chamadas no `app_server.R`, até o catálogo de temas (passo 5).
+- **Ordem dos temas:** a ordem do catálogo (ver "Catálogo de temas").
+
+### Filtro espacial pelo polígono (13/11/2026)
+
+- **Antes:** a consulta de cada tema vetorial trazia do banco tudo o que tocava o retângulo envolvente da área de estudo (`SELECT *` + `Shape.STAsText()`), e o R filtrava a interseção. Numa LT longa e diagonal, o retângulo cobre muito mais que o corredor, e Processos Minerários e Rodovias traziam milhares de feições à toa. A geometria vinha duas vezes: a `Shape` no formato interno do SQL Server e o WKT.
+- **Agora (`consultar_tema_bd()`):**
+  - O filtro no banco usa o polígono da área de estudo, com `MakeValid()`, a mesma expressão do `contar_raster_bd()` (`sql_geometria()`).
+  - A geometria vem só em WKB (`Shape.STAsBinary()`), mais leve que o WKT e sem perda de precisão. A `Shape` original e a `GDB_GEOMATTR_DATA` não são trazidas.
+  - As colunas de atributos vêm do `INFORMATION_SCHEMA.COLUMNS` (`colunas_tema_bd()`), com as de tamanho máximo no fim, como o driver ODBC exige. Aceita `esquema.tabela`. Custa uma consulta a mais por tema, só de metadados.
+  - O filtro com GEOS no R continua, como garantia. O SQL Server e o GEOS calculam no plano, então os dois dão o mesmo resultado.
+- **Precisão do polígono:** o `st_as_text()` arredonda por padrão para 7 algarismos significativos (~1 m em graus). O `sql_geometria()` usa 15, e o `contar_raster_bd()` passou a usar a mesma função.
+- **Tamanho da consulta:** num bipolo fictício de 2.586 km, a área de estudo tem de 1.200 a 2.900 vértices (buffer de 10 km a 40 m), e o texto da consulta fica entre 45 e 105 KB, longe do limite do SQL Server. Uma área de estudo enviada pronta, muito detalhada, pode ser maior; se a consulta ficar lenta, simplificar o polígono antes (sem encolhê-lo).
+- **Falta:** medir o tempo antes e depois num corredor real, com Processos Minerários e Rodovias, e conferir que o número de interferências não muda. Script pronto, só de leitura: `dev/medir_filtro_poligono.R`.
+
+### Leitura do traçado (14/11/2026)
+
+- **Funções** (`R/fct_tracado.R`), ainda sem uso na interface:
+  - `listar_camadas(caminho, nome)`: camadas do arquivo, com tipo de geometria e número de feições, para a escolha da camada.
+  - `ler_tracado(caminho, nome, camada)`: devolve uma feição em 4674, sem Z/M (o KML traz altitude).
+  - `tipo_geometria()`: "ponto", "linha" ou "poligono". Define se a distância de buffer é obrigatória ou fica desabilitada.
+- **Formatos:** `.zip` com shapefile (com `.dbf`, `.shx` e `.prj`) ou com `.gdb`, na raiz ou numa pasta; `.kml`; `.kmz`; `.gpkg`. A conferência do shapefile de 13/11/2026 foi reaproveitada. Um `.zip` com mais de um conjunto de dados (dois shapefiles, ou shapefile e `.gdb`) é recusado.
+- **Recusas, todas com mensagem (`erro_entrada`):** formato não aceito; arquivo corrompido; várias camadas sem a escolha de uma; camada inexistente, sem geometria, sem feições ou sem sistema de coordenadas; mais de uma feição; feição vazia; geometria que não é ponto, linha ou polígono.
+- **KML:** o formato não informa o tipo de geometria das camadas, então `listar_camadas()` não descarta nenhuma, e uma camada sem geometria só é recusada na leitura.
+- **`ler_corredor()`:** continua para a interface atual (só `.zip` com polígono), agora como uma chamada de `ler_tracado()`.
+
+### Buffer geodésico (14/11/2026)
+
+- **Problema:** o `st_buffer()` do `sf` em coordenadas geográficas usa o s2, que aproxima o buffer por células (`s2_buffer_cells`). Num traçado fictício de 2.586 km, com os parâmetros padrão (`max_cells = 1000`):
+
+  | Buffer | Área esperada | Área do s2 | Distância máxima da borda ao eixo |
+  |---|---|---|---|
+  | 40 m | 207 km² | 9.541 km² | 5.240 m |
+  | 2,5 km | 12.950 km² | 25.972 km² | 11.959 m |
+
+  Com `max_cells = 1e5`, o de 40 m ainda deu 373 km², borda a até 143 m e 157 mil vértices. O app ainda não fazia buffer, então nenhum resultado publicado foi afetado. O corredor fictício dos testes, gerado com o s2, foi substituído.
+- **Solução (`buffer_geodesico()`, `R/fct_area_estudo.R`):** cada ponto, e cada trecho de linha de até 50 km, é projetado numa azimutal equidistante (elipsoide GRS80, o do SIRGAS 2000) centrada nele, recebe o buffer em metros e volta a 4674. As partes são unidas num só polígono. A linha é densificada pelo caminho geodésico a cada 1 km antes da divisão: com vértices a cada 5 km, o buffer de 40 m ficava até 6 mm mais estreito.
+- **Simplificação:** cada parte recebe o buffer com uma folga de 0,05% da distância e é simplificada com essa tolerância, em metros. A borda fica entre a distância pedida e 0,1% a mais (40 m: até 4 cm; 2,5 km: até 2,5 m), nunca menos. Sem isso, um traçado com 20 mil vértices gerava uma área de estudo com 640 mil vértices, que vai no texto de cada consulta ao banco.
+- **Validação:** distância de vértices da borda ao eixo medida no elipsoide, com uma azimutal equidistante centrada em cada vértice, que dá a distância exata a partir do centro. Nos testes automatizados (40 m, 2,5 km, 10 km em ponto, bipolo de ~1.400 km), a borda fica sempre no intervalo acima.
+- **Desempenho:** LT fictícia de 2.642 km com 6.116 vértices: ~2,3 s; área de estudo com 6.400 a 8.400 vértices; consulta ao banco de ~230 a 300 KB. A área do buffer de 40 m deu 211,8 km², para 211,4 km² esperados (2 × 0,04 km × 2.642 km).
+- **Funções:**
+  - `gerar_area_estudo(tracado, distancia_km)`: buffer para ponto e linha (distância obrigatória, maior que zero); polígono é usado como veio e não aceita distância. Devolve a área de estudo com a coluna `distancia_km` (NA para área enviada pronta).
+  - `area_km2()`: área com o s2, para mostrar na interface.
+  - `parse_distancia()`: texto em km no formato brasileiro (vírgula decimal, ponto de milhar quando há vírgula; sem vírgula, o ponto é decimal; aceita "km" no fim).
+  - `conferir_distancia()`: NULL ou a mensagem para o `validate()` do campo de distância.
+
+### Catálogo de temas (15/11/2026)
+
+- **Onde:** seção `temas` do `inst/golem-config.yml`, uma entrada por tema, na ordem em que aparecem na interface e na planilha de conferência. Substitui a lista fixa do `app_server.R` e do `app_ui.R`, a seção `temas` antiga (só chave e tabela) e as chaves soltas `mapbiomas_colecao` e `filtro_linhas_transmissao`.
+- **Campos:** `nome` (único; é o nome na interface e na planilha), `grupo` (item do menu), `subgrupo` (caixa na página do grupo; padrão: o grupo), `tipo` e os campos de cada tipo:
+  - `vetor_bd`: `tabela`; opcional `filtro` (expressão R em texto).
+  - `raster_bd`: `tabela`, `legenda` ("mapbiomas" ou "declividade"), `colecao` (MapBiomas), `ordem` ("percentagem" ou "classe") e `todas_classes`.
+  - `vetor_arquivo` (provisório, só a Hidrografia): `caminho` e `camada`, com `filtro` opcional.
+  - Todos: `colunas` opcional (colunas exibidas).
+- **Funções (`R/fct_catalogo.R`):** `catalogo_temas()` lê e confere o catálogo: campos obrigatórios, tipo conhecido e nomes únicos (o registro de resultados usa o nome). Um catálogo com problema impede o app de iniciar, com mensagem. `consulta_tema()` monta a função de consulta de cada tema pelo tipo, e `legenda_raster()` prepara a legenda dos rasters.
+- **Interface:** o `app_ui.R` monta o menu, as caixas e as abas a partir do catálogo. O HTML gerado foi comparado com o da versão anterior e é idêntico (fora os identificadores internos). Os módulos passaram a usar a chave do tema como identificador (ex.: `hidrografia` em vez de `curso_agua`).
+- **Colunas exibidas:** `colunas_exibidas()` aplica a lista `colunas` do tema na tabela da interface (e, no futuro, na síntese). Sem lista, saem só as colunas técnicas (`OBJECTID`, `Shape_Length`, `Shape_Area`, `GlobalID` etc.). A planilha de conferência traz todas. Nenhum tema tem lista ainda: falta definir as colunas de cada tema, com os nomes reais das tabelas.
+- **Novo tema:** basta uma entrada no catálogo, se o tipo já existir. Um tipo novo (ex.: outra legenda de raster) exige código em `consulta_tema()` ou `legenda_raster()`.
+- **`.Renviron.exemplo`:** criado, com as variáveis do banco, da Hidrografia e do banco de teste.
 
 - **`shinydashboard`:** continua no `DESCRIPTION` enquanto o app publicado usar essa interface. Sai na migração para `bslib`.
 

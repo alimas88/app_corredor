@@ -1,4 +1,4 @@
-# ler_corredor(): conferência do .zip da área de estudo
+# ler_corredor(): conferência do .zip da área de estudo (interface atual)
 
 test_that("lê o shapefile e devolve uma feição em SIRGAS 2000", {
   zip <- zip_shapefile(area_estudo_teste())
@@ -35,7 +35,7 @@ test_that("aceita a extensão .ZIP em maiúsculas", {
 
 test_that("recusa arquivo que não é .zip", {
   expect_error(ler_corredor(tempfile(), "area.kml"),
-               "não é um .zip", class = "erro_corredor")
+               "não é um .zip", class = "erro_entrada")
 })
 
 test_that("recusa .zip corrompido", {
@@ -43,39 +43,39 @@ test_that("recusa .zip corrompido", {
   writeLines("isto não é um zip", falso)
 
   expect_error(ler_corredor(falso, "area.zip"),
-               "corrompido", class = "erro_corredor")
+               "corrompido", class = "erro_entrada")
 })
 
 test_that("recusa .zip sem shapefile", {
   zip <- zip_shapefile(NULL, extras = "leia-me.txt")
   expect_error(ler_corredor(zip, "area.zip"),
-               "não contém um shapefile", class = "erro_corredor")
+               "não contém um shapefile \\(.shp\\) nem um geodatabase", class = "erro_entrada")
 })
 
 test_that("recusa .zip com mais de um shapefile", {
   zip <- zip_shapefile(area_estudo_teste(), extras = "outro.shp")
   expect_error(ler_corredor(zip, "area.zip"),
-               "mais de um shapefile", class = "erro_corredor")
+               "mais de um conjunto de dados", class = "erro_entrada")
 })
 
 test_that("aponta os arquivos obrigatórios que faltam", {
   expect_error(ler_corredor(zip_shapefile(area_estudo_teste(), sem = "dbf"), "a.zip"),
-               "Falta no .zip o .dbf", class = "erro_corredor")
+               "Falta no .zip o .dbf", class = "erro_entrada")
   expect_error(ler_corredor(zip_shapefile(area_estudo_teste(), sem = c("dbf", "shx")), "a.zip"),
-               "o .dbf e o .shx", class = "erro_corredor")
+               "o .dbf e o .shx", class = "erro_entrada")
   expect_error(ler_corredor(zip_shapefile(area_estudo_teste(), sem = "prj"), "a.zip"),
-               "não tem o arquivo .prj", class = "erro_corredor")
+               "não tem o arquivo .prj", class = "erro_entrada")
 })
 
 test_that("recusa geometria que não é polígono", {
   linha <- sf::st_sf(id = 1L, geometry = sf::st_cast(sf::st_geometry(area_estudo_teste()),
                                                       "MULTILINESTRING"))
   expect_error(ler_corredor(zip_shapefile(linha), "a.zip"),
-               "Geometria inadequada", class = "erro_corredor")
+               "Geometria inadequada", class = "erro_entrada")
 })
 
 test_that("recusa mais de uma feição", {
   duas <- rbind(area_estudo_teste(), area_estudo_teste())
   expect_error(ler_corredor(zip_shapefile(duas), "a.zip"),
-               "tem 2 feições", class = "erro_corredor")
+               "tem 2 feições", class = "erro_entrada")
 })

@@ -39,8 +39,8 @@ mod_corredor_server <- function(id){
       lido <- tryCatch(
         list(sf = ler_corredor(input$corredor$datapath, input$corredor$name),
              erro = NULL),
-        # problemas previstos no arquivo (ver ler_corredor())
-        erro_corredor = function(e) list(sf = NULL, erro = conditionMessage(e)),
+        # problemas previstos no arquivo (ver ler_tracado())
+        erro_entrada = function(e) list(sf = NULL, erro = conditionMessage(e)),
         # qualquer outro erro: não derruba a sessão
         error = function(e) list(sf = NULL,
                                  erro = paste("Não foi possível ler o arquivo:",

@@ -1,8 +1,9 @@
 ^.*\.Rproj$
-^\.Rproj\.user$
-^data-raw$
-^dev$
 ^CLAUDE\.md$
 ^LICENSE\.md$
 ^\.Renviron.*$
+^\.Renviron\.exemplo$
+^\.Rproj\.user$
 ^\.github$
+^data-raw$
+^dev$

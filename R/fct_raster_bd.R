@@ -35,9 +35,7 @@ contar_raster_bd <- function(con, tabela, area, srid = 4674) {
   # A coluna varbinary(max) precisa ser a última do SELECT (driver ODBC).
   tiles <- DBI::dbGetQuery(con, glue::glue(
     "SELECT tile_id, tif FROM {tabela} ",
-    "WHERE Shape.STIntersects(",
-    "geometry::STGeomFromText('{sf::st_as_text(area, digits = 7)}', {srid}).MakeValid()",
-    ") = 1;"
+    "WHERE Shape.STIntersects({sql_geometria(area, srid)}) = 1;"
   ))
 
   if (nrow(tiles) == 0) return(vazio)

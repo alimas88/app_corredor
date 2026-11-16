@@ -29,10 +29,12 @@ mod_tema_ui <- function(id) {
 #' @param tema String. Nome do tema, usado nas mensagens, na planilha de
 #'   conferência e no registro.
 #' @param registro reactiveVal criado por `registro_criar()`. Opcional.
+#' @param colunas Colunas mostradas na tabela (ver `colunas_exibidas()`), ou
+#'   NULL para todas menos as técnicas. Não afeta a planilha de conferência.
 #'
 #' @return reactive com o `resultado_tema`.
 #' @noRd
-mod_tema_server <- function(id, area, consulta, tema, registro = NULL) {
+mod_tema_server <- function(id, area, consulta, tema, registro = NULL, colunas = NULL) {
 
   stopifnot(is.function(consulta))
 
@@ -58,7 +60,7 @@ mod_tema_server <- function(id, area, consulta, tema, registro = NULL) {
       r <- resultado()
       validate(need(r$situacao != SITUACAO[["nao_verificado"]],
                     paste0("Tema não verificado: ", r$erro)))
-      tabela_dt(preparar_aba(r$dados))
+      tabela_dt(colunas_exibidas(preparar_aba(r$dados), colunas))
     }, server = FALSE)
 
     resultado
